@@ -17,6 +17,7 @@ CLICK_DECLS
 //MODULE_LICENSE("GPL");
 #endif
 
+ErrorHandler* Dropper::myLogger;
 
 Dropper::Dropper( )
 : _tcpDrop( 0.0 )
@@ -38,7 +39,7 @@ int Dropper::configure( Vector<String> &conf, ErrorHandler *errH )
 #ifndef CLICK_LINUXMODULE
 	srand( time(NULL) );
 #endif
-	
+	Dropper::myLogger=ErrorHandler::default_handler();
 	return cp_va_kparse( conf,this,errH,
 					"TCP_DROP",  cpkPositional, cpInteger, &_tcpDrop,
 					"TCP_RESET", cpkPositional, cpInteger, &_tcpReset,
@@ -51,24 +52,31 @@ int Dropper::configure( Vector<String> &conf, ErrorHandler *errH )
 					cpEnd );
 }
 
-Packet* Dropper::simple_action( Packet *pkt )
+void Dropper::killPacket( Packet *pkt )
 {
-	if( rand()<(1-_tcpDrop) )
-		return processTcpDrop( pkt );
-	else if( rand()<(1-_tcpReset) )
-		return processTcpReset( pkt );
+	/// @todo Send packet to the output port 4 if someone have connected to it, otherwise discard packet
+	pkt->kill( );
+}
+
+// Packet* Dropper::simple_action( Packet *pkt )
+void Dropper::push( int, Packet *pkt )
+{
+	if( rand()<_tcpDrop )
+		processTcpDrop( pkt );
+	else if( rand()<_tcpReset )
+		processTcpReset( pkt );
 	else
 /// @todo	Realize all other attacks	
-		return pkt;
+		output(0).push( pkt );
 }
 
-Packet* Dropper::processTcpDrop( Packet *pkt )
+void Dropper::processTcpDrop( Packet *pkt )
 {
-	pkt->kill( );
-	return NULL;
+	// myLogger->debug( "Yeah. We did it!" );
+	killPacket( pkt );
 }
 
-Packet* Dropper::processTcpReset( Packet *pkt )
+void Dropper::processTcpReset( Packet *pkt )
 {
 	// Create packet with FIN flag set and same src/dst ip/port and sequence numbers
 	WritablePacket *p=pkt->uniqueify();
@@ -76,15 +84,14 @@ Packet* Dropper::processTcpReset( Packet *pkt )
 	tcph->th_flags=TH_FIN;
 	tcph->th_off=0;			//discard any additional header
 	
+	assert( pkt->length()>=24 ); // valid TCP packets MUST have size over this value
 	p->take( pkt->length()-16/*TCP header*/-8/*IP Header*/ ); // discard all usefull data
+	output( 0 ).push( p );
 	
-	pkt->kill();
-	return p;
+	killPacket( pkt );
 }
-
 
 CLICK_ENDDECLS
 //ELEMENT_MT_SAFE(Dropper)
 
 EXPORT_ELEMENT(Dropper)
-ELEMENT_REQUIRES(linuxmodule)

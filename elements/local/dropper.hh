@@ -12,6 +12,16 @@ CLICK_DECLS
 #include <linux/random.h>
 #endif
 
+/**
+Ports:
+	- input 0: TCP packet
+	- output 0: TCP packet downstream
+	- output 1: TCP packet upstream
+	- output 2: ARP packet downstream
+	- output 3: ARP packet upstream
+	- output 4: Dismissed legal TCP packets
+*/
+
 class Dropper : public Element
 {
 public:
@@ -19,15 +29,18 @@ public:
 	~Dropper(){}
 	
 	const char *class_name() const { return "Dropper"; }
-	const char *port_count() const { return PORTS_1_1X2; }
-	const char *processing() const { return AGNOSTIC; }
+	const char *port_count() const { return "1/1-"; }
+	const char *processing() const { return PUSH; }
 	
 	int configure( Vector<String>&, ErrorHandler* );
-	Packet* simple_action( Packet* );
+	//Packet* simple_action( Packet* );
+	void push( int, Packet* );
 
 protected:
-	Packet* processTcpDrop( Packet* );
-	Packet* processTcpReset( Packet* );
+	void processTcpDrop( Packet *pkt );
+	void processTcpReset( Packet *pkt );
+	
+	void killPacket( Packet *pkt );
 
 private:
 	inline int rand();
@@ -53,14 +66,19 @@ private:
 	imitation of the congestion control - attacking particular congestion control algorithms
 	?
 	*/
+	
+	static ErrorHandler *myLogger;
 };
+
+#define PROB_GRANUL		1000000000
 
 int Dropper::rand( )
 {
+	return click_random() % PROB_GRANUL;
 #ifndef CLICK_LINUXMODULE
-	return rand()%100;
+	return rand()%PROB_GRANUL;
 #else
-	return random32()%100;
+	return random32()%PROB_GRANUL;
 #endif
 }
 
