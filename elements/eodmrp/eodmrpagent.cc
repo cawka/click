@@ -31,6 +31,8 @@
 #include <click/packet_anno.hh>
 #include <clicknet/ip.h>
 #include <clicknet/udp.h>
+#include <click/confparse.hh>
+
 #include "debug.hh"
 //#include <time.h>
 CLICK_DECLS

@@ -21,6 +21,7 @@
 #include <click/ipaddress.hh>
 #include <click/elemfilter.hh>
 #include <click/router.hh>
+#include <click/confparse.hh>
 #include "debug.hh"
 
 

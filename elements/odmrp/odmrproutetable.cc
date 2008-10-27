@@ -1,5 +1,5 @@
 /*
- * EodmrpRoutingTable.{cc,hh} -- data structure for EODMRP groups and receivers
+ * OdmrpRoutingTable.{cc,hh} -- data structure for ODMRP groups and receivers
  * Soon Y. Oh
  *
  * Copyright (c) 2005, 2006 University of California, Los Angeles
@@ -17,7 +17,7 @@
 
 
 #include <click/config.h>
-#include "eodmrproutetable.hh"
+#include "odmrproutetable.hh"
 #include <click/ipaddress.hh>
 #include <click/elemfilter.hh>
 #include <click/router.hh>
@@ -25,21 +25,21 @@
 #include "debug.hh"
 
 
-EodmrpRoutingTable::EodmrpRoutingTable()
+OdmrpRoutingTable::OdmrpRoutingTable()
 {
 }
 
 
-EodmrpRoutingTable::~EodmrpRoutingTable()
+OdmrpRoutingTable::~OdmrpRoutingTable()
 {
 }
 
 
 int
-EodmrpRoutingTable::initialize(ErrorHandler *)
+OdmrpRoutingTable::initialize(ErrorHandler *)
 { 
 	head = tail = NULL; 
-  return EODMRP_SUCCESS;
+  return ODMRP_SUCCESS;
 }
 
 
@@ -49,7 +49,7 @@ EodmrpRoutingTable::initialize(ErrorHandler *)
  *                                                                                         *
  *******************************************************************************************/
 int
-EodmrpRoutingTable::configure(Vector<String> &conf, ErrorHandler *errh)
+OdmrpRoutingTable::configure(Vector<String> &conf, ErrorHandler *errh)
 {	
   if (conf.size() == 0) {
 		return 0;
@@ -66,11 +66,11 @@ EodmrpRoutingTable::configure(Vector<String> &conf, ErrorHandler *errh)
  *                                                                                         *
  *******************************************************************************************/
 int
-EodmrpRoutingTable::addroute(IPAddress mcast,IPAddress prev, int h){
-	if(findRoute(mcast) == EODMRP_SUCCESS){
+OdmrpRoutingTable::addroute(IPAddress mcast,IPAddress prev, int h){
+	if(findRoute(mcast) == ODMRP_SUCCESS){
 		// route is already in the routing table. Just update table
 		updateroute(mcast, prev,h);
-		return EODMRP_SUCCESS;
+		return ODMRP_SUCCESS;
 	}else{
 		if(head == NULL){
 	    head = new routingTable;
@@ -79,7 +79,7 @@ EodmrpRoutingTable::addroute(IPAddress mcast,IPAddress prev, int h){
 	    head->hop_count = h;
 	    head->next = NULL;
 	    tail = head;
-	    return EODMRP_SUCCESS;
+	    return ODMRP_SUCCESS;
 	  }else{
 	    tail->next = new routingTable;
 	    tail->next->mcast_addr = mcast;
@@ -87,11 +87,11 @@ EodmrpRoutingTable::addroute(IPAddress mcast,IPAddress prev, int h){
 	    tail->next->hop_count = h;
 	    tail = tail->next;
 	    tail->next = NULL;
-	    return EODMRP_SUCCESS;
+	    return ODMRP_SUCCESS;
 	  }
 	}
 
-  return EODMRP_FAIL;
+  return ODMRP_FAIL;
 }
 
 
@@ -101,7 +101,7 @@ EodmrpRoutingTable::addroute(IPAddress mcast,IPAddress prev, int h){
  *                                                                                         *
  *******************************************************************************************/
 int
-EodmrpRoutingTable::removeroute(IPAddress mcast){
+OdmrpRoutingTable::removeroute(IPAddress mcast){
   routingTable *temp = head;
   if(head->mcast_addr == mcast){
     if(head == tail){
@@ -110,7 +110,7 @@ EodmrpRoutingTable::removeroute(IPAddress mcast){
       head = head->next;
     }
     delete temp;
-    return EODMRP_SUCCESS;
+    return ODMRP_SUCCESS;
   }else{
     routingTable *temp1;
     temp1 = temp->next;
@@ -122,13 +122,13 @@ EodmrpRoutingTable::removeroute(IPAddress mcast){
           temp->next = temp1->next;
 				}
 				delete temp1;
-				return EODMRP_SUCCESS;
+				return ODMRP_SUCCESS;
       }
       temp = temp1;
       temp1 = temp->next;
     }
   }
-  return EODMRP_FAIL;	
+  return ODMRP_FAIL;	
 }
 
 
@@ -138,27 +138,27 @@ EodmrpRoutingTable::removeroute(IPAddress mcast){
  *                                                                                         *
  *******************************************************************************************/
 int 
-EodmrpRoutingTable::setprevhop(IPAddress mcast, IPAddress prev){
+OdmrpRoutingTable::setprevhop(IPAddress mcast, IPAddress prev){
   if(head == NULL){
   	// no entry in the routing table
-  	return EODMRP_FAIL;
+  	return ODMRP_FAIL;
   }
   
   if(head->mcast_addr == mcast){
 	  head->prevhop = prev;
-	  return EODMRP_SUCCESS;
+	  return ODMRP_SUCCESS;
 	}else{
 	  routingTable *temp = head->next;
 	  while(temp){
 			if(temp->mcast_addr == mcast){
 			  temp->prevhop = prev;
-			  return EODMRP_SUCCESS;
+			  return ODMRP_SUCCESS;
 			}
 			temp = temp->next;
 	  }
 	  
 	}
-	return EODMRP_FAIL;
+	return ODMRP_FAIL;
   
 }
 
@@ -169,7 +169,7 @@ EodmrpRoutingTable::setprevhop(IPAddress mcast, IPAddress prev){
  *                                                                                         *
  *******************************************************************************************/
 int 
-EodmrpRoutingTable::updateroute(IPAddress mcast, IPAddress prev,int h){
+OdmrpRoutingTable::updateroute(IPAddress mcast, IPAddress prev,int h){
   if(head == NULL){
   	return addroute(mcast, prev, h);  	
   }
@@ -177,14 +177,14 @@ EodmrpRoutingTable::updateroute(IPAddress mcast, IPAddress prev,int h){
   if(head->mcast_addr == mcast){
 	  head->prevhop = prev;
 	  head->hop_count = h;
-	  return EODMRP_SUCCESS;
+	  return ODMRP_SUCCESS;
 	}else{
 	  routingTable *temp = head->next;
 	  while(temp){
 			if(temp->mcast_addr == mcast){
 		  	temp->prevhop = prev;
 		  	temp->hop_count = h;
-		  	return EODMRP_SUCCESS;
+		  	return ODMRP_SUCCESS;
 			}
 			temp = temp->next;
 	  }	  
@@ -200,9 +200,9 @@ EodmrpRoutingTable::updateroute(IPAddress mcast, IPAddress prev,int h){
  *                                                                                         *
  *******************************************************************************************/
 int 
-EodmrpRoutingTable::findhop(IPAddress mcast){
+OdmrpRoutingTable::findhop(IPAddress mcast){
   if(head == NULL){
-  	return EODMRP_FAIL;  	
+  	return ODMRP_FAIL;  	
   }
 
   if(head->mcast_addr == mcast){
@@ -216,7 +216,7 @@ EodmrpRoutingTable::findhop(IPAddress mcast){
 			temp = temp->next;
 	  }	  
 	}
-	return EODMRP_FAIL;
+	return ODMRP_FAIL;
 }
 
 
@@ -226,10 +226,10 @@ EodmrpRoutingTable::findhop(IPAddress mcast){
  *                                                                                         *
  *******************************************************************************************/
 IPAddress
-EodmrpRoutingTable::findprevhop(IPAddress mcast){
+OdmrpRoutingTable::findprevhop(IPAddress mcast){
   if(head == NULL){
   	// no entry
-  	return EODMRP_FAIL;  	
+  	return ODMRP_FAIL;  	
   }
 
 	// find a previous hop address and return it
@@ -245,7 +245,7 @@ EodmrpRoutingTable::findprevhop(IPAddress mcast){
 	  }	  
 	}
 	// fail to find it
-	return EODMRP_FAIL;
+	return ODMRP_FAIL;
 
 }
 
@@ -256,27 +256,27 @@ EodmrpRoutingTable::findprevhop(IPAddress mcast){
  *                                                                                         *
  *******************************************************************************************/
 int
-EodmrpRoutingTable::findRoute(IPAddress mcast){
+OdmrpRoutingTable::findRoute(IPAddress mcast){
   if(head == NULL){
   	// no entry
-  	return EODMRP_FAIL;  	
+  	return ODMRP_FAIL;  	
   }
 
   if(head->mcast_addr == mcast){
-	  return EODMRP_SUCCESS;
+	  return ODMRP_SUCCESS;
 	}else{
 	  routingTable *temp = head->next;
 	  while(temp){
 			if(temp->mcast_addr == mcast){
-			  return EODMRP_SUCCESS;
+			  return ODMRP_SUCCESS;
 			}
 			temp = temp->next;
 	  }	  
 	}
-	return EODMRP_FAIL;	
+	return ODMRP_FAIL;	
 }
 
 
-EXPORT_ELEMENT(EodmrpRoutingTable)
+EXPORT_ELEMENT(OdmrpRoutingTable)
 
  
