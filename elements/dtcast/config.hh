@@ -52,4 +52,9 @@
 */
 #define TIMEOUT_3_NEWSOURCE     60
 
+/**
+ *	CacheTable maximum size
+ */
+#define CACHE_TABLE_MAX_SIZE	1024
+
 #endif

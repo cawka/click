@@ -5,6 +5,11 @@
 #ifndef DTCAST_HH_DTCAST
 #define DTCAST_HH_DTCAST
 
+#include <click/packet.hh>
+#include <click/vector.hh>
+
+#include "config.hh"
+
 /**
  *  Protocol number for DTCAST
 */
@@ -27,12 +32,13 @@
 #define DTCAST_ERDATA_TTL 2
 #define DTCAST_ERACK_TTL  4
 
-#include <click/packet.hh>
-#include <click/vector.hh>
-
 typedef uint32_t node_t;
 typedef uint32_t age_t;
 typedef Vector<uint32_t> nodelist_t;
+
+#define DTCAST_NODE_SELF	0
+
+#include "defs/algorithm.hh"
 
 #include "defs/DtcastPacket.hh"
 #include "defs/DtcastRRPacket.hh"
@@ -40,5 +46,7 @@ typedef Vector<uint32_t> nodelist_t;
 #include "defs/DtcastDataPacket.hh"
 #include "defs/DtcastAckPacket.hh"
 
+#include "defs/DtcastCacheTable.hh"
+#include "defs/DtcastSRoutingTable.hh"
 
 #endif
