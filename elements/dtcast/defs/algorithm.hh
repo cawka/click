@@ -15,6 +15,17 @@ find( InputIterator begin, InputIterator end, const T &val )
     return begin;
 }
 
+
+template <class InputIterator,class T,class Q>
+inline InputIterator
+find( InputIterator begin, InputIterator end, const T &member, const Q &val )//bool (T::*member)(const Q&), const Q &val )
+{
+    while( begin!=end && !((*begin).*member)(val) )
+	begin++;
+    return begin;
+}
+
+
 template <class B,class T>
 inline void
 purge( T &list )

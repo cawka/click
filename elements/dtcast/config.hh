@@ -13,17 +13,19 @@
 
 
 /**
-    Period of the route discovery while there is some data in message queue
+ *	Period of the route discovery while there is some data in message queue
 */
 #define ROUTE_REQUEST_TIME      5      
-
+#define ROUTE_REQUEST_MAXAGE	10 ///< == Source Routing Table record max age
 
 /**
     Period of the route table retransmitting
 */
 #define ROUTE_REPLY_TIME        5
+#define ROUTE_REPLY_MAXAGE		10 ///< == Source Routing Table record max age
 
 
+#define MESSAGE_QUEUE_CHECK_PERIOD	10 ///< Perdio for checking data messages actuality in queue
 /**
     Data packet retransmit timeout (TIMEOUT 1)
 */

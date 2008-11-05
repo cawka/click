@@ -49,8 +49,7 @@ public:
 			{
 				dtcast_cache_tuple_t *tmp=_table.front( );
 				_table.pop_front( );
-				delete tmp; // i'm not sure that is was safe to delete _table.fron() before pop_front()
-							// example shows 3-stage purging process
+				delete tmp;
 			}
 			_table.push_back( tuple );
 		}
@@ -64,15 +63,11 @@ public:
 	}
 	
 private:
-	/**
-	 *	@todo Optimize cache searching
-	 */
 	bool findTuple( const dtcast_cache_tuple_t &tuple )
 	{
-//		for( list_t::iterator i=_table.begin(); i!=_table.end(); i++ )
-//		{
-//			if( *i==tuple ) return true;
-//		}
+		/**
+		 *	@todo Optimize cache searching
+		 */
 		return find( _table.begin(),_table.end(),tuple )!=_table.end( );
 	}
 	

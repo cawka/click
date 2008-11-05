@@ -35,8 +35,11 @@
 typedef uint32_t node_t;
 typedef uint32_t age_t;
 typedef Vector<uint32_t> nodelist_t;
+typedef uint32_t mcast_t;
 
 #define DTCAST_NODE_SELF	0
+#define DTCAST_NODE_ALL		(-1)
+
 
 #include "defs/algorithm.hh"
 
@@ -48,5 +51,7 @@ typedef Vector<uint32_t> nodelist_t;
 
 #include "defs/DtcastCacheTable.hh"
 #include "defs/DtcastSRoutingTable.hh"
+#include "defs/DtcastForwardingTable.hh"
+#include "defs/DtcastMessageQueue.hh"
 
 #endif
