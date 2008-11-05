@@ -28,8 +28,14 @@ struct age_tuple_t
 	}
 };
 
+class Purger
+{
+public:
+	virtual void purgeOldRecords( Timer *timer )=0;
+};
+
 template<class tuple_t,const int MAXAGE>
-class AgeTable
+class AgeTable : public Purger
 {
 public:
 	void addOrUpdate( tuple_t *tuple )
@@ -49,7 +55,7 @@ public:
 		purge<tuple_t>( _table );
 	}
 	
-	void purgeOldRecords( Timer *timer )
+	virtual void purgeOldRecords( Timer *timer )
 	{
 		iterator i=find( _table.begin(),_table.end(),
 								  &tuple_t::canPurge,Timestamp::now() );
@@ -67,5 +73,9 @@ private:
 	typedef typename table_t::iterator iterator;
 	table_t _table;
 };
+
+
+void callbackHelper( Timer *timer, void *param ); //defined in Forwarder.cc
+
 
 #endif

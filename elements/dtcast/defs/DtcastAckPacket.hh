@@ -13,6 +13,7 @@
  */
 class DtcastAckPacket : public DtcastPacket
 {
+public:
 	static DtcastAckPacket* make( node_t src,mcast_t mcast,
 			uint32_t seq, 
 			nodelist_t dsts, 

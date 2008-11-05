@@ -12,6 +12,7 @@
  */
 class DtcastDataPacket : public DtcastPacket
 {
+public:
 	static DtcastDataPacket* make( node_t src,mcast_t mcast,
 			uint32_t seq, 
 			age_t age, 
@@ -33,9 +34,9 @@ class DtcastDataPacket : public DtcastPacket
 		return pkt;
 	}
 	
-	static DtcastRRPacket* make( DtcastPacket *dtcast )
+	static DtcastDataPacket* make( DtcastPacket *dtcast )
 	{
-		DtcastRRPacket *rr=static_cast<DtcastRRPacket*>( dtcast );
+		DtcastDataPacket *rr=static_cast<DtcastDataPacket*>( dtcast );
 		
 		if( rr->dtcast()->_type!=DTCAST_TYPE_ERDATA && 
 			rr->dtcast()->_type!=DTCAST_TYPE_DATA )

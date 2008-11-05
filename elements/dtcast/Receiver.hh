@@ -31,10 +31,9 @@ public:
 //	~DtcastForwarder( );
 
 	const char *class_name() const { return "DtcastReceiver"; }
-	const char *port_count() const { return PORTS_1_1; }
-	const char *processing() const { return "h/hl"; }
+	const char *port_count() const { return PORTS_0_0; }
 
-//	int configure( Vector<String>&, ErrorHandler* );
+	int configure( Vector<String>&, ErrorHandler* );
 //	Packet* simple_action( Packet* );
 //	void push( int port, Packet* );
 //	Packet *pull( int port );

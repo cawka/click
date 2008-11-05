@@ -13,6 +13,7 @@
  */
 class DtcastRRPacket : public DtcastPacket
 {
+public:
 	static DtcastRRPacket* make( node_t src,mcast_t mcast,
 			uint32_t seq )
 	{

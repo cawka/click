@@ -35,16 +35,21 @@ public:
 
 	const char *class_name() const { return "DtcastForwarder"; }
 	const char *port_count() const { return PORTS_1_1; }
-	const char *processing() const { return "h/hl"; }
+	const char *processing() const { return "h/h"; }
 
+	virtual int initialize( ErrorHandler *errH );
 	int configure( Vector<String>&, ErrorHandler* );
-	Packet* simple_action( Packet* );
 	void push( int port, Packet* );
-	Packet *pull( int port );
 
 // Forwarding interface
 protected:
-
+	void onRouteRequest( DtcastRRPacket* );
+	void onRouteReply( DtcastRTPacket* );
+	void onData( DtcastDataPacket* );
+	void onAck( DtcastAckPacket* );
+	void onERData( DtcastDataPacket* );
+	void onERAck( DtcastAckPacket* );
+	
 private:
 	DtcastSource			*_source;
 	DtcastReceiver			*_receiver;
@@ -52,6 +57,9 @@ private:
 	DtcastCacheTable		_cache;
 	DtcastSRoutingTable		_source_routing;
 	DtcastForwardingTable	_forwarding;
+	
+	Timer _refresher_source_routing;
+	Timer _refresher_forwarding;
 };
 
 CLICK_ENDDECLS
