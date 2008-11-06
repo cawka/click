@@ -35,43 +35,43 @@ public:
 };
 
 template<class tuple_t,const int MAXAGE>
-class AgeTable : public Purger
+class AgeTable : public Purger, public List<tuple_t,&tuple_t::link>
 {
 public:
 	void addOrUpdate( tuple_t *tuple )
 	{
-		iterator test=find( _table.begin(), _table.end(), *tuple );
-		if( test!=_table.end() )
+		iterator test=find( this->begin(), this->end(), *tuple );
+		if( test!=this->end() )
 		{
 			test->update( );
 			delete tuple;
 		}
 		else
-			_table.push_back( tuple );
+			push_back( tuple );
 	}
 	
 	~AgeTable( )
 	{
-		purge<tuple_t>( _table );
+		purge<tuple_t>( *this );
 	}
 	
 	virtual void purgeOldRecords( Timer *timer )
 	{
-		iterator i=find( _table.begin(),_table.end(),
+		iterator i=find( this->begin(),this->end(),
 								  &tuple_t::canPurge,Timestamp::now() );
-		while( i!=_table.end() )
+		while( i!=this->end() )
 		{
-			i=_table.erase( i );
-			i=find( i,_table.end(),
+			i=this->erase( i );
+			i=find( i,this->end(),
 					&tuple_t::canPurge,Timestamp::now() );
 		}
-		timer->reschedule_after_sec( MAXAGE );
+		if( timer ) timer->reschedule_after_sec( MAXAGE );
 	}
 
-private:
+//private:
 	typedef List<tuple_t,&tuple_t::link> table_t;
 	typedef typename table_t::iterator iterator;
-	table_t _table;
+//	table_t _table;
 };
 
 

@@ -11,14 +11,14 @@
 struct dtcast_cache_tuple_t
 {
 	node_t		_src_id;
-	IPAddress	_mcast_ip;
+	mcast_t		_mcast_id;
 	uint16_t	_type;
 	uint32_t	_seq;
 	
 	List_member<dtcast_cache_tuple_t> link;
 	
-	dtcast_cache_tuple_t( node_t src_id, IPAddress mcast_ip, uint16_t type, uint32_t seq )
-			: _src_id(src_id),_mcast_ip(mcast_ip),_type(type),_seq(seq)
+	dtcast_cache_tuple_t( node_t src_id, mcast_t mcast_id, uint16_t type, uint32_t seq )
+			: _src_id(src_id),_mcast_id(mcast_id),_type(type),_seq(seq)
 	{
 		
 	}
@@ -26,7 +26,7 @@ struct dtcast_cache_tuple_t
 	bool operator==( const dtcast_cache_tuple_t &tuple ) const
 	{
 		return	tuple._src_id  ==_src_id		&&
-				tuple._mcast_ip==_mcast_ip		&&
+				tuple._mcast_id==_mcast_id		&&
 				tuple._type    ==_type			&&
 				tuple._seq     ==_seq;
 	}
@@ -36,9 +36,9 @@ struct dtcast_cache_tuple_t
 class DtcastCacheTable
 {
 public:
-	bool hasTuple( node_t src_id, IPAddress mcast_ip, uint16_t type, uint32_t seq )
+	bool hasTuple( node_t src_id, mcast_t mcast_id, uint16_t type, uint32_t seq )
 	{
-		dtcast_cache_tuple_t *tuple=new dtcast_cache_tuple_t( src_id,mcast_ip,type,seq );
+		dtcast_cache_tuple_t *tuple=new dtcast_cache_tuple_t( src_id,mcast_id,type,seq );
 		
 		bool found=findTuple( *tuple );
 		if( found )

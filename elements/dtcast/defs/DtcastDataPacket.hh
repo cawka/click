@@ -6,6 +6,7 @@
 #define DEFS_DTCASTDATAPACKET_HH_DTCAST
 
 #include "DtcastPacket.hh"
+#include "DtcastMessageQueue.hh"
 
 /**
  *	DTCAST Data packet
@@ -13,25 +14,35 @@
 class DtcastDataPacket : public DtcastPacket
 {
 public:
-	static DtcastDataPacket* make( node_t src,mcast_t mcast,
+	static DtcastDataPacket* make( node_t src,mcast_t mcast, node_t from,
 			uint32_t seq, 
 			age_t age, 
 			const unsigned char *body, uint16_t body_len,
 			bool epidemic=false )
 	{
 		DtcastDataPacket *pkt=static_cast<DtcastDataPacket*>( DtcastPacket::make(
-				src,mcast, epidemic?DTCAST_ERDATA_TTL:DTCAST_DATA_TTL, 
+				src,mcast,from, epidemic?DTCAST_ERDATA_TTL:DTCAST_DATA_TTL, 
 				epidemic?DTCAST_TYPE_ERDATA:DTCAST_TYPE_DATA, seq, 
 				sizeof(node_t)+sizeof(age_t)+body_len) );
 
 		unsigned char *data=pkt->dtcast_payload( );
-		
+
 		memcpy( data,&age,sizeof(age_t) );
 		uint16_t offset=sizeof(node_t);
 
 		memcpy( data+offset,body,body_len );
 		
 		return pkt;
+	}
+	
+	static DtcastDataPacket* make( dtcast_message_t &msg )
+	{
+		return make( msg._src_id ,msg._mcast_id,msg._from,
+				msg._seq,
+				msg._actual_till.sec(),
+				msg._data, msg._data_len,
+				msg._epidemic
+				);
 	}
 	
 	static DtcastDataPacket* make( DtcastPacket *dtcast )
@@ -53,6 +64,12 @@ public:
 		}
 
 		return rr;
+	}
+	
+	Packet* data_payload( )
+	{
+		this->pull( sizeof(click_ip)+sizeof(dtcast_header_t)+1 );
+		return this;
 	}
 	
 public: //non-static methods

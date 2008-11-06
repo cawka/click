@@ -34,7 +34,7 @@ public:
 	~DtcastForwarder( );
 
 	const char *class_name() const { return "DtcastForwarder"; }
-	const char *port_count() const { return PORTS_1_1; }
+	const char *port_count() const { return "1-2/1"; }
 	const char *processing() const { return "h/h"; }
 
 	virtual int initialize( ErrorHandler *errH );
@@ -49,12 +49,12 @@ protected:
 	void onAck( DtcastAckPacket* );
 	void onERData( DtcastDataPacket* );
 	void onERAck( DtcastAckPacket* );
-	
+
 private:
+	node_t	_me;
 	DtcastSource			*_source;
 	DtcastReceiver			*_receiver;
 	
-	DtcastCacheTable		_cache;
 	DtcastSRoutingTable		_source_routing;
 	DtcastForwardingTable	_forwarding;
 	

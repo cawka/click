@@ -20,6 +20,7 @@ struct dtcast_header_t
 	uint32_t _seq;
 	node_t   _src;
 	mcast_t  _mcast;
+	node_t   _from; ///< node, which have actually broadcasted packet (for source path learing)
 };
 
 /**
@@ -29,32 +30,6 @@ class DtcastPacket : public WritablePacket
 {
 //default constructor is disabled in Packet class
 public: //static methods
-	static DtcastPacket* make( node_t src,mcast_t mcast,
-                uint8_t ttl,
-                uint16_t type, uint32_t seq, 
-                uint16_t length )
-	{
-		
-		DtcastPacket *pkt=static_cast<DtcastPacket*>( Packet::make(sizeof(click_ip)+
-																   sizeof(dtcast_header_t)+length) );
-		click_ip* ip=pkt->ip_header( );
-		ip->ip_p=IP_PROTO_DTCAST;
-
-		ip->ip_len = htons( pkt->length() );
-		ip->ip_hl = sizeof(click_ip) >> 2;
-		ip->ip_v = 4;
-		ip->ip_ttl = ttl;
-                
-		dtcast_header_t *header=pkt->dtcast();
-		header->_type=type; 
-		header->_length=length;
-		header->_seq=seq;
-		header->_mcast=mcast;
-		header->_src=src;
-		
-		return pkt;
-	}
-	
 	static DtcastPacket* make( Packet *orig )
 	{
 		if( orig->length()<sizeof(click_ip)+sizeof(dtcast_header_t) ) 
@@ -82,18 +57,48 @@ public: //static methods
 		return pkt;
 	}
 	
-	static Packet* finalizePacket( DtcastPacket *pkt )
-	{
-		click_ip* ip=pkt->ip_header( );
-		ip->ip_sum = click_in_cksum( (unsigned char *)ip, sizeof(*ip) );
-		return pkt;
-	}
-	
 public: //non-static methods
+	Packet* finalizePacket( )
+	{
+		click_ip* ip=ip_header( );
+		ip->ip_sum = click_in_cksum( (unsigned char *)ip, sizeof(*ip) );
+		return this;
+	}
+
 	unsigned char *dtcast_payload( ) { return data()+sizeof(click_ip)+sizeof(dtcast_header_t); }
 	dtcast_header_t* dtcast( ) { return reinterpret_cast<dtcast_header_t*>( data()+sizeof(click_ip) ); };
 	
 	uint8_t   ttl( ) { return ip_header()->ip_ttl; }
+
+protected:
+	static DtcastPacket* make( node_t src,mcast_t mcast, node_t from,
+                uint8_t ttl,
+                uint16_t type, uint32_t seq, 
+                uint16_t length )
+	{
+		DtcastPacket *pkt=static_cast<DtcastPacket*>( Packet::make(sizeof(click_ip)+
+																   sizeof(dtcast_header_t)+length) );
+		pkt->set_ip_header( (click_ip*)pkt->data(),sizeof(click_ip) );
+		memset( pkt->ip_header( ),0,sizeof(sizeof(click_ip)) );
+
+		click_ip* ip=(click_ip*)pkt->ip_header( );
+		ip->ip_p=IP_PROTO_DTCAST;
+
+		ip->ip_len = htons( pkt->length() );
+		ip->ip_hl = sizeof(click_ip) >> 2;
+		ip->ip_v = 4;
+		ip->ip_ttl = ttl;
+                
+		dtcast_header_t *header=pkt->dtcast();
+		header->_type=type; 
+		header->_length=length;
+		header->_seq=seq;
+		header->_mcast=mcast;
+		header->_src=src;
+		header->_from=from;
+		
+		return pkt;
+	}
 };
 
 

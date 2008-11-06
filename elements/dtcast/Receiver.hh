@@ -11,18 +11,20 @@
 CLICK_DECLS
 
 /*
- * =c DtcastForwarder( SOURCE : DtcastSource, DESTINATION : DtcastReceiver )
+ * =c DtcastReceiver( NODE : <integer>, MCAST : <integer> )
  *
  * =s DTCAST
- * DTCAST protocol forwarding functionality.
+ * DTCAST protocol receiver functionality.
  * 
  * =d
  *
  * Input should be IP packets with protocol IP_PROTO_DTCAST (138).
  * All non DTCAST packets will be discarded.
  *
+ * Receiver has NODE identificator and designated to receive MCAST stream
+ *
  * =a
- * DtcastForwarder, DtcastReceiver
+ * DtcastForwarder, DtcastSource
  */
 class DtcastReceiver : public Element
 {
@@ -31,17 +33,15 @@ public:
 //	~DtcastForwarder( );
 
 	const char *class_name() const { return "DtcastReceiver"; }
-	const char *port_count() const { return PORTS_0_0; }
+	const char *port_count() const { return PORTS_1_1; }
+	const char *processing() const { return "h/h"; }
 
 	int configure( Vector<String>&, ErrorHandler* );
-//	Packet* simple_action( Packet* );
-//	void push( int port, Packet* );
-//	Packet *pull( int port );
-
-// Forwarding interface
-protected:
+	void push( int port, Packet *pkt );
 
 private:
+	node_t  _me;
+	mcast_t _mcast;
 };
 
 CLICK_ENDDECLS

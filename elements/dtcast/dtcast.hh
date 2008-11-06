@@ -40,6 +40,7 @@ typedef uint32_t mcast_t;
 #define DTCAST_NODE_SELF	0
 #define DTCAST_NODE_ALL		(-1)
 
+#define DTCAST_MCAST_NULL	0
 
 #include "defs/algorithm.hh"
 

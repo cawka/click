@@ -16,3 +16,7 @@ autom4te*
 +*
 depcomp
 installch
+userlevel
+linuxmodule
+*.o
+*.click~

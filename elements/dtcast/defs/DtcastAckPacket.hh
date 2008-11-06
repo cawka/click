@@ -14,7 +14,7 @@
 class DtcastAckPacket : public DtcastPacket
 {
 public:
-	static DtcastAckPacket* make( node_t src,mcast_t mcast,
+	static DtcastAckPacket* make( node_t src,mcast_t mcast, node_t from,
 			uint32_t seq, 
 			nodelist_t dsts, 
 			bool epidemic=false )
@@ -22,7 +22,7 @@ public:
 		if( dsts.size()==0 ) return NULL;
 		
 		DtcastAckPacket *pkt=static_cast<DtcastAckPacket*>( DtcastPacket::make(
-				src,mcast, epidemic?DTCAST_ERACK_TTL:DTCAST_ACK_TTL, 
+				src,mcast,from, epidemic?DTCAST_ERACK_TTL:DTCAST_ACK_TTL, 
 				epidemic?DTCAST_TYPE_ERACK:DTCAST_TYPE_ACK, seq, 
 				dsts.size()*sizeof(node_t)) );
 

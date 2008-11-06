@@ -14,12 +14,12 @@
 class DtcastRTPacket : public DtcastPacket
 {
 public:
-	static DtcastRTPacket* make( node_t src,mcast_t mcast,
+	static DtcastRTPacket* make( node_t src,mcast_t mcast,node_t from,
 			uint32_t seq, 
 			node_t next, nodelist_t dsts )
 	{
 		DtcastRTPacket *pkt=static_cast<DtcastRTPacket*>( DtcastPacket::make(
-				src,mcast, DTCAST_RT_TTL, 
+				src,mcast,from, DTCAST_RT_TTL, 
 				DTCAST_TYPE_RT, seq, 
 				sizeof(node_t)+dsts.size()*sizeof(node_t)) );
 

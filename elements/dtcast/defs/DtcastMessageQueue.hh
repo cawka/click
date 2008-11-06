@@ -17,6 +17,7 @@ struct dtcast_message_t
 {
 	mcast_t _mcast_id;
 	node_t	_src_id;
+	node_t  _from;
 	uint32_t _seq;
 	Timestamp _actual_till;
 	nodelist_t _unack_ids;
@@ -26,14 +27,24 @@ struct dtcast_message_t
 	
 	List_member<dtcast_message_t> link;
 	
-	dtcast_message_t( mcast_t mcast_id, node_t src_id, uint32_t seq,
-			Timestamp actual_till, const nodelist_t &dst_ids,
-			const unsigned char *data, uint16_t data_len,
-			bool epidemic=false)
-			: _mcast_id(mcast_id),_src_id(src_id),
-			_seq(seq),_actual_till(actual_till),_unack_ids(dst_ids),
-			_data_len(data_len),
-			_epidemic(epidemic)
+	dtcast_message_t( 
+						node_t src_id, 
+						mcast_t mcast_id, 
+						node_t from,
+						uint32_t seq,
+						Timestamp actual_till, 
+						const nodelist_t &dst_ids,
+						const unsigned char *data, 
+						uint16_t data_len,
+						bool epidemic=false )
+			: _mcast_id(mcast_id)
+			,_src_id(src_id)
+			,_from(from)
+			,_seq(seq)
+			,_actual_till(actual_till)
+			,_unack_ids(dst_ids)
+			,_data_len(data_len)
+			,_epidemic(epidemic)
 	{
 		_data=new unsigned char[_data_len];
 		memcpy( _data, data, _data_len );
