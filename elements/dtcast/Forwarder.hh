@@ -41,7 +41,6 @@ public:
 	int configure( Vector<String>&, ErrorHandler* );
 	void push( int port, Packet* );
 
-// Forwarding interface
 protected:
 	void onRouteRequest( DtcastRRPacket* );
 	void onRouteReply( DtcastRTPacket* );
@@ -49,6 +48,12 @@ protected:
 	void onAck( DtcastAckPacket* );
 	void onERData( DtcastDataPacket* );
 	void onERAck( DtcastAckPacket* );
+
+	void onRefreshSRouting( );
+	void onRefreshForwarding( );
+
+protected:
+	void run_timer( Timer * );
 
 private:
 	node_t	_me;

@@ -7,7 +7,7 @@
 
 #include <click/timestamp.hh>
 #include <click/timer.hh>
-#include <click/list.hh>
+#include <click/hashtable.hh>
 #include "algorithm.hh"
 
 template <const int MAXAGE>
@@ -15,9 +15,9 @@ struct age_tuple_t
 {
 	Timestamp	_last_update;
 	
-	age_tuple_t( ) { update(); }
+	age_tuple_t( ) { update(*this); }
 	
-	void update( )
+	void update( age_tuple_t& )
 	{
 		_last_update=Timestamp::now( );
 	}
@@ -35,19 +35,30 @@ public:
 };
 
 template<class tuple_t,const int MAXAGE>
-class AgeTable : public Purger, public List<tuple_t,&tuple_t::link>
+class AgeTable : public Purger, public HashTable<tuple_t,tuple_t*>
 {
 public:
-	void addOrUpdate( tuple_t *tuple )
+	/**
+	 * Adds or updates record in the table
+	 *
+	 * @return true - added, false - updated //iterator of the added or update record
+	 */
+	bool addOrUpdate( tuple_t *tuple )
 	{
-		iterator test=find( this->begin(), this->end(), *tuple );
-		if( test!=this->end() )
+		tuple_t *test=this->get( *tuple );//find( this->begin(), this->end(), *tuple );
+		if( test )
 		{
-			test->update( );
+			test->update( *tuple );
 			delete tuple;
+			return false;
 		}
 		else
-			push_back( tuple );
+		{
+//			push_back( tuple );
+			this->set( *tuple, tuple );
+			//return this->end();//(this->end()-1);
+			return true;
+		}
 	}
 	
 	~AgeTable( )
@@ -58,7 +69,7 @@ public:
 	virtual void purgeOldRecords( Timer *timer )
 	{
 		iterator i=find( this->begin(),this->end(),
-								  &tuple_t::canPurge,Timestamp::now() );
+						 &tuple_t::canPurge,Timestamp::now() );
 		while( i!=this->end() )
 		{
 			i=this->erase( i );
@@ -69,7 +80,7 @@ public:
 	}
 
 //private:
-	typedef List<tuple_t,&tuple_t::link> table_t;
+	typedef HashTable<tuple_t,tuple_t*> table_t;
 	typedef typename table_t::iterator iterator;
 //	table_t _table;
 };

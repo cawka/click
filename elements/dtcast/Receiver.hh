@@ -29,19 +29,26 @@ CLICK_DECLS
 class DtcastReceiver : public Element
 {
 public:
-//	DtcastForwarder( );
-//	~DtcastForwarder( );
+	DtcastReceiver( )
+			: _seq( 0 ) 
+	{ }
+/**
+ *	@todo Add states to and Local Recovery functinality
+ */
 
 	const char *class_name() const { return "DtcastReceiver"; }
-	const char *port_count() const { return PORTS_1_1; }
+	const char *port_count() const { return "1/2"; }
 	const char *processing() const { return "h/h"; }
 
 	int configure( Vector<String>&, ErrorHandler* );
 	void push( int port, Packet *pkt );
 
+	void onRouteRequest( DtcastRRPacket *pkt );
 private:
 	node_t  _me;
 	mcast_t _mcast;
+	
+	uint32_t _seq;
 };
 
 CLICK_ENDDECLS

@@ -25,7 +25,7 @@ struct dtcast_message_t
 	uint16_t _data_len;
 	bool _epidemic;
 	
-	List_member<dtcast_message_t> link;
+//	List_member<dtcast_message_t> link;
 	
 	dtcast_message_t( 
 						node_t src_id, 
@@ -55,15 +55,20 @@ struct dtcast_message_t
 		delete _data;
 	}
 	
-	bool operator==( const dtcast_message_t &tuple )
+	bool operator==( const dtcast_message_t &tuple ) const
 	{
 		return	tuple._src_id ==_src_id && 
 				tuple._mcast_id==_mcast_id &&
 				tuple._seq==_seq;
 	}
-	void update( ) { }
+	void update( dtcast_message_t& ) { }
 	
 	bool canPurge( Timestamp ref ) { return ref>_actual_till; };
+
+	hashcode_t hashcode( ) const
+	{
+		return (_src_id^(_mcast_id<<16)) ^ (0xFFFF&_mcast_id) ^ _from ^ _seq;
+	}
 };
 
 class DtcastMessageQueue : public AgeTable<dtcast_message_t,MESSAGE_QUEUE_CHECK_PERIOD>

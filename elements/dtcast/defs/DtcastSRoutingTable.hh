@@ -11,16 +11,32 @@ struct dtcast_srouting_tuple_t : public age_tuple_t<ROUTE_REQUEST_MAXAGE>
 {
 	node_t	_src_id;
 	node_t	_next_id;
-	List_member<dtcast_srouting_tuple_t> link;
+//	List_member<dtcast_srouting_tuple_t> link;
 	
 	dtcast_srouting_tuple_t( node_t src_id, node_t next_id )
 			: _src_id(src_id),_next_id(next_id)
 	{ }
 	
-	bool operator==( const dtcast_srouting_tuple_t &tuple )
+	void update( age_tuple_t<ROUTE_REQUEST_MAXAGE> &tuple )
 	{
-		return	tuple._src_id ==_src_id && 
-				tuple._next_id==_next_id;
+		_next_id=((dtcast_srouting_tuple_t&)tuple)._next_id;
+		
+		age_tuple_t<ROUTE_REQUEST_MAXAGE>::update( tuple );
+	}
+	
+	bool operator==( const dtcast_srouting_tuple_t &tuple ) const
+	{
+		return isEqualSource( tuple._src_id );
+	}
+	
+	bool isEqualSource( node_t src ) const
+	{
+		return src==_src_id;
+	}
+	
+	hashcode_t hashcode( ) const
+	{
+		return _src_id;
 	}
 };
 

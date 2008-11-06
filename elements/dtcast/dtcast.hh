@@ -34,8 +34,18 @@
 
 typedef uint32_t node_t;
 typedef uint32_t age_t;
-typedef Vector<uint32_t> nodelist_t;
 typedef uint32_t mcast_t;
+
+class nodelist_t : public Vector<uint32_t>
+{
+public:
+	nodelist_t& add( uint32_t val )
+	{
+		push_back( val );
+		return *this;
+	}
+};
+//typedef Vector<uint32_t> nodelist_t;
 
 #define DTCAST_NODE_SELF	0
 #define DTCAST_NODE_ALL		(-1)

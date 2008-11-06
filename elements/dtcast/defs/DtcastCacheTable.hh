@@ -59,7 +59,7 @@ public:
 	
 	~DtcastCacheTable( )
 	{
-		purge<dtcast_cache_tuple_t>( _table );
+		purgeList<dtcast_cache_tuple_t>( _table );
 	}
 	
 private:

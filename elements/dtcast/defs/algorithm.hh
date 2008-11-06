@@ -20,7 +20,7 @@ template <class InputIterator,class T,class Q>
 inline InputIterator
 find( InputIterator begin, InputIterator end, const T &member, const Q &val )//bool (T::*member)(const Q&), const Q &val )
 {
-    while( begin!=end && !((*begin).*member)(val) )
+    while( begin!=end && !((*begin).second->*member)(val) )
 	begin++;
     return begin;
 }
@@ -29,6 +29,22 @@ find( InputIterator begin, InputIterator end, const T &member, const Q &val )//b
 template <class B,class T>
 inline void
 purge( T &list )
+{
+	for( typename T::iterator i=list.begin(); i!=list.end(); i++ )
+	{
+		delete i->second;
+	}
+//	while( !list.empty() )
+//	{
+//		B *tmp=list.front( );
+//		list.pop_front();
+//		delete tmp;
+//	}
+};
+
+template <class B,class T>
+inline void
+purgeList( T &list )
 {
 	while( !list.empty() )
 	{
