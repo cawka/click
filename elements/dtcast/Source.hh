@@ -38,6 +38,8 @@ public:
 	virtual int initialize( ErrorHandler* );
 	int configure( Vector<String>&, ErrorHandler* );
 	void push( int port, Packet *pkt );
+	
+	void onRouteReply( DtcastRTPacket *pkt );
 
 // Forwarding interface
 protected:

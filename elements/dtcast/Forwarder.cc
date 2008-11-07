@@ -17,8 +17,10 @@ CLICK_DECLS
 //};
 
 DtcastForwarder::DtcastForwarder()
-		: _me(DTCAST_NODE_SELF),_source(NULL), _receiver(NULL)
-, _refresher_source_routing(this), _refresher_forwarding(this)
+	: _me(DTCAST_NODE_SELF)
+	, _source(NULL), _receiver(NULL)
+	, _refresher_source_routing(this)
+	, _refresher_forwarding(this)
 {
 }
 
@@ -86,8 +88,11 @@ void DtcastForwarder::onRouteRequest( DtcastRRPacket *pkt )
 {
 	if( pkt==NULL ) return;
 	//ErrorHandler::default_handler( )->message( "DTCAST: we've got RouteRequest packet" );
-	_source_routing.addOrUpdate( new dtcast_srouting_tuple_t(pkt->dtcast()->_src,pkt->dtcast()->_from) );
+	_source_routing.addOrUpdate( new dtcast_srouting_tuple_t(pkt->dtcast()->_src,
+			( pkt->dtcast()->_from==DTCAST_NODE_SELF?_me:pkt->dtcast()->_from )) );
 	
+	// forwarder node has no states. It simply maintain routing and forwarding
+	// table and rebroadcasts all necessary packets
 	_receiver->onRouteRequest( pkt );
 
 	pkt->dtcast()->_from=_me;
@@ -98,33 +103,40 @@ void DtcastForwarder::onRouteReply( DtcastRTPacket *pkt )
 {
 	if( pkt==NULL ) return;
 	if( pkt->next_id()!=_me && pkt->dtcast()->_from!=DTCAST_NODE_SELF ) { pkt->kill(); return; }
-	
-	DtcastSRoutingTable::iterator sroute=find( _source_routing.begin(), _source_routing.end(), 
-			&dtcast_srouting_tuple_t::isEqualSource, pkt->dtcast()->_src );
 
-	/**
-	 * If there is record in the Source Routing Table, than add/or update records in forwarding
-	 * table for all nodes in the Route Reply packet
-	 *
-	 * If we actually have added record, try to immediately propagate RouteReply via early scheduling
-	 * or forwarding table refreshment
-	 */
-	if( sroute!=_source_routing.end() ) 
+	dtcast_srouting_tuple_t *sRoute=_source_routing.get( srouting_key_t(pkt->dtcast()->_src) );
+
+	if( !sRoute ) //hmmm, timeout or someone tries to do something wrong
 	{
-		nodelist_t nodes=pkt->dst_ids( );
-		bool immediate=false;
-		for( nodelist_t::iterator i=nodes.begin(); i!=nodes.end(); i++ )
-		{
-			bool isnew=_forwarding.addOrUpdate( 
-					new dtcast_fwd_tuple_t(pkt->dtcast()->_mcast,pkt->dtcast()->_src,
-						*i,pkt->dtcast()->_from!=DTCAST_NODE_SELF) );
-			
-			if( isnew ) immediate=true;
-		}
-		if( immediate ) _refresher_forwarding.schedule_now( );
+		pkt->kill( );
+		return;
+	}
+
+	_forwarding.addOrUpdate( new dtcast_fwd_tuple_t(pkt->dtcast()->_mcast, pkt->dtcast()->_src) );
+
+	dtcast_fwd_tuple_t *fwd=_forwarding.get( dtcast_fwd_tuple_t(pkt->dtcast()->_mcast, pkt->dtcast()->_src) );
+	if( fwd==NULL )
+	{
+		ErrorHandler::default_handler()->fatal( "DtcastForwarder::onRouteReply >> Something really wrong" );
+	}
+
+	nodelist_t nodes=pkt->dst_ids( );
+	for( nodelist_t::iterator dst=nodes.begin(); dst!=nodes.end(); dst++ )
+	{
+		fwd->_dsts.addOrUpdate( new dtcast_dst_tuple_t(*dst,pkt->dtcast()->_from!=DTCAST_NODE_SELF) );
 	}
 	
-	pkt->kill( );
+	if( sRoute->_next_id==_me ) //source is local
+	{
+		_source->onRouteReply( pkt );
+		pkt->kill( );
+	}
+	else
+	{
+		pkt->next_id( sRoute->_next_id );
+		pkt->dtcast()->_from=_me;
+		output( 0 ).push( pkt );
+	}
 }
 
 void DtcastForwarder::onData( DtcastDataPacket *pkt )
@@ -157,25 +169,24 @@ void DtcastForwarder::onERAck( DtcastAckPacket *pkt )
 }
 
 
-void DtcastForwarder::onRefreshSRouting( )
+void DtcastForwarder::onRefreshSRouting( Timer *timer )
 {
-	
-	
 	_forwarding.purgeOldRecords( NULL );
+	timer->reschedule_after_sec( ROUTE_REQUEST_TIME );
 }
 
-void DtcastForwarder::onRefreshForwarding( )
+void DtcastForwarder::onRefreshForwarding( Timer *timer )
 {
-	
 	_source_routing.purgeOldRecords( NULL );
+	timer->reschedule_after_sec( ROUTE_REQUEST_TIME );
 }
 
 void DtcastForwarder::run_timer( Timer *timer )
 {
 	if( timer==&this->_refresher_forwarding )
-		onRefreshForwarding( );
+		onRefreshForwarding( timer );
 	else if( timer==&this->_refresher_source_routing )
-		onRefreshSRouting( );
+		onRefreshSRouting( timer );
 }
 
 CLICK_ENDDECLS

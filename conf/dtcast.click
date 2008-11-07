@@ -16,14 +16,15 @@ elementclass UpdateIPHeader
 		  -> output;
 }
 
-src :: DtcastSource( 2,131 )
-dst :: DtcastReceiver
+src :: DtcastSource(   1,  131 )
+dst :: DtcastReceiver( 2,  131 )
 
-fwd :: DtcastForwarder( 2, src, dst )
+fwd :: DtcastForwarder( 3, src, dst )
 
 FromDevice( eth1 ) -> 
 	class :: Classifier( 12/0800 21/8a,
-						 12/0800 );
+						 12/0800,
+						 12/fff0 ); //dum rule
 
 class[0]
 	-> DtcastPrint("mcast->fwd")
@@ -43,7 +44,10 @@ fwd
 	-> DtcastPrint("fwd->mcast")
 	-> Discard
 
+class[2] -> dst
+dst[0] -> DtcastPrint("dst0->fwd ")->Discard
 
+dst[1] -> DtcastPrint("dst1->fwd ")-> fwd
 
 
 
@@ -51,3 +55,4 @@ fwd
 
 //fwd ->
 //	Discard
+

@@ -42,11 +42,11 @@ void DtcastReceiver::onRouteRequest( DtcastRRPacket *pkt )
 	{
 		// special DTCAST RouteReply packet. NEXT field is set to invalid value, DST field is set to SELF node,
 		// which will indicate local delivery for forwarding table
-		output( 0 ).push( DtcastRTPacket::make(pkt->dtcast()->_src,pkt->dtcast()->_mcast,DTCAST_NODE_SELF,
-					_seq++,DTCAST_NODE_ALL,nodelist_t().add( _me )) );
+		output( 1 ).push( DtcastRTPacket::make(pkt->dtcast()->_src,pkt->dtcast()->_mcast,
+					DTCAST_NODE_SELF,_seq++,DTCAST_NODE_ALL,nodelist_t().add( _me )) );
 	}
 	
-	//do not kill packet, because Forwarder will resend it further
+	//do not kill packet, because Forwarder will reuse it
 }
 
 CLICK_ENDDECLS

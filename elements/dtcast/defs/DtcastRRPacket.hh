@@ -6,6 +6,7 @@
 #define DEFS_DTCASTRRPACKET_HH_DTCAST
 
 #include "DtcastPacket.hh"
+#include "DtcastSRoutingTable.hh"
 #include <click/error.hh>
 
 /**

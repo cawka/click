@@ -36,6 +36,13 @@ public:
 		return pkt;
 	}
 	
+	static DtcastRTPacket* make( node_t src,mcast_t mcast,node_t from,
+			uint32_t seq, 
+			node_t next, node_t dst )
+	{
+		return make( src,mcast,from,seq,next, nodelist_t().add(dst) );
+	}
+
 	static DtcastRTPacket* make( DtcastPacket *dtcast )
 	{
 		DtcastRTPacket *rt=static_cast<DtcastRTPacket*>( dtcast );
@@ -56,7 +63,10 @@ public:
 		return rt;
 	}
 public: //non-static methods
-	node_t next_id( ) { return *( (node_t*)dtcast_payload() ); }
+	node_t next_id( )      { return *( (node_t*)dtcast_payload() ); }
+	void   next_id( node_t node ) { *( (node_t*)dtcast_payload() )=node; }
+	
+	node_t dst1( ) { return *( (node_t*)(dtcast_payload()+sizeof(node_t)) ); }
 	
 	nodelist_t dst_ids( )
 	{

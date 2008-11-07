@@ -24,24 +24,45 @@ struct dtcast_srouting_tuple_t : public age_tuple_t<ROUTE_REQUEST_MAXAGE>
 		age_tuple_t<ROUTE_REQUEST_MAXAGE>::update( tuple );
 	}
 	
-	bool operator==( const dtcast_srouting_tuple_t &tuple ) const
-	{
-		return isEqualSource( tuple._src_id );
-	}
-	
 	bool isEqualSource( node_t src ) const
 	{
 		return src==_src_id;
 	}
+};
+
+inline StringAccum& operator<<(StringAccum &os,const dtcast_srouting_tuple_t &t)
+{
+	return os << "src="  << t._src_id << ",next="  << t._next_id
+			  << ",remains=" << (ROUTE_REQUEST_MAXAGE+(t._last_update-Timestamp::now()).sec()) << "sec";
+}
+
+struct srouting_key_t
+{
+	srouting_key_t( node_t src_id )
+			: _src_id(src_id)
+	{ }
+
+	srouting_key_t( const dtcast_srouting_tuple_t &tuple )
+			: _src_id(tuple._src_id)
+	{ }
 	
 	hashcode_t hashcode( ) const
 	{
 		return _src_id;
 	}
+
+	bool operator==( const srouting_key_t &tuple ) const
+	{
+		return tuple._src_id==_src_id;
+	}
+	
+	node_t _src_id;
 };
 
-class DtcastSRoutingTable : public AgeTable<dtcast_srouting_tuple_t,ROUTE_REQUEST_MAXAGE>
+class DtcastSRoutingTable : public AgeTable<srouting_key_t,dtcast_srouting_tuple_t,ROUTE_REQUEST_MAXAGE>
 {
+public:
+	DtcastSRoutingTable() { _label="SROUTING"; _debug=true; }
 };
 
 #endif

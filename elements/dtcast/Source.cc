@@ -69,7 +69,7 @@ void DtcastSource::run_timer( Timer *timer )
 	{
 		if( Timestamp::now()-_lastRRSendBy>ROUTE_REQUEST_TIME )
 		{
-			output( 0 ).push( DtcastRRPacket::make(_me,_mcast,_me,_seq_rr++) );
+			output( 0 ).push( DtcastRRPacket::make(_me,_mcast,DTCAST_NODE_SELF,_seq_rr++) );
 			_lastRRSendBy=Timestamp::now();
 		}
 		
@@ -80,6 +80,11 @@ void DtcastSource::run_timer( Timer *timer )
 	}
 	
 	timer->reschedule_after_sec( ROUTE_REQUEST_TIME );
+}
+
+void DtcastSource::onRouteReply( DtcastRTPacket * )
+{
+	/// maybe do something usefull
 }
 
 CLICK_ENDDECLS

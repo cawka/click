@@ -8,6 +8,7 @@
 #include <click/timestamp.hh>
 #include <click/timer.hh>
 #include <click/hashtable.hh>
+#include <click/straccum.hh>
 #include "algorithm.hh"
 
 template <const int MAXAGE>
@@ -19,6 +20,7 @@ struct age_tuple_t
 	
 	void update( age_tuple_t& )
 	{
+//		ErrorHandler::default_handler()->debug( "BUGOGA: I'm updated" );
 		_last_update=Timestamp::now( );
 	}
 	
@@ -34,8 +36,8 @@ public:
 	virtual void purgeOldRecords( Timer *timer )=0;
 };
 
-template<class tuple_t,const int MAXAGE>
-class AgeTable : public Purger, public HashTable<tuple_t,tuple_t*>
+template<class key_t, class tuple_t,const int MAXAGE>
+class AgeTable : public Purger, public HashTable<key_t,tuple_t*>
 {
 public:
 	/**
@@ -45,7 +47,7 @@ public:
 	 */
 	bool addOrUpdate( tuple_t *tuple )
 	{
-		tuple_t *test=this->get( *tuple );//find( this->begin(), this->end(), *tuple );
+		tuple_t *test=this->get( key_t(*tuple) );//find( this->begin(), this->end(), *tuple );
 		if( test )
 		{
 			test->update( *tuple );
@@ -55,7 +57,7 @@ public:
 		else
 		{
 //			push_back( tuple );
-			this->set( *tuple, tuple );
+			this->set( key_t(*tuple), tuple );
 			//return this->end();//(this->end()-1);
 			return true;
 		}
@@ -77,16 +79,42 @@ public:
 					&tuple_t::canPurge,Timestamp::now() );
 		}
 		if( timer ) timer->reschedule_after_sec( MAXAGE );
+		
+		
+		/**
+		 * DEBUGGING
+		 */
+		if( !_debug ) return;
+//		ErrorHandler::default_handler()->debug( "%s: <<<<<<<<",  _label.c_str());
+		for( i=this->begin(); i!=this->end(); i++ )
+		{
+			StringAccum os; os << *(i->second);
+			ErrorHandler::default_handler()->debug( "%s: %s", _label.c_str(),
+				os.take_string().c_str() );
+		}				
 	}
 
 //private:
-	typedef HashTable<tuple_t,tuple_t*> table_t;
+	typedef HashTable<key_t,tuple_t*> table_t;
 	typedef typename table_t::iterator iterator;
 //	table_t _table;
+	String _label;
+	bool _debug;
 };
 
 
-void callbackHelper( Timer *timer, void *param ); //defined in Forwarder.cc
+//void callbackHelper( Timer *timer, void *param ); //defined in Forwarder.cc
 
+
+template<class key_t, class tuple_t,const int MAXAGE>
+inline StringAccum& operator<<(StringAccum &os,const AgeTable<key_t,tuple_t,MAXAGE> &table )
+{
+	for( typename AgeTable<key_t,tuple_t,MAXAGE>::const_iterator i=table.begin(); i!=table.end(); i++ )
+	{
+		if( i!=table.begin() ) os << "\n";
+		os << *(i->second);
+	}
+	return os;
+}
 
 #endif

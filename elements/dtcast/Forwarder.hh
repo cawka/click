@@ -49,8 +49,8 @@ protected:
 	void onERData( DtcastDataPacket* );
 	void onERAck( DtcastAckPacket* );
 
-	void onRefreshSRouting( );
-	void onRefreshForwarding( );
+	void onRefreshSRouting( Timer *timer );
+	void onRefreshForwarding( Timer *timer );
 
 protected:
 	void run_timer( Timer * );

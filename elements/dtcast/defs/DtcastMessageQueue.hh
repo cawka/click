@@ -55,24 +55,50 @@ struct dtcast_message_t
 		delete _data;
 	}
 	
-	bool operator==( const dtcast_message_t &tuple ) const
+	void update( dtcast_message_t& ) { }
+	
+	bool canPurge( Timestamp ref ) { return ref>_actual_till; };
+};
+
+inline StringAccum& operator<<(StringAccum &os,const dtcast_message_t &t)
+{
+	return os << "seq=" << t._seq << ",mcast=" << t._mcast_id << ",src="  << t._src_id
+			  << ",valid="  << (t._actual_till - Timestamp::now()).sec() << "sec";
+}
+
+
+struct msg_key_t
+{
+	msg_key_t( const dtcast_message_t &tuple )
+			:
+			_src_id(tuple._src_id)
+			,_mcast_id(tuple._mcast_id)
+			,_seq(tuple._seq)
+	{
+	}
+
+	bool operator==( const msg_key_t &tuple ) const
 	{
 		return	tuple._src_id ==_src_id && 
 				tuple._mcast_id==_mcast_id &&
 				tuple._seq==_seq;
 	}
-	void update( dtcast_message_t& ) { }
-	
-	bool canPurge( Timestamp ref ) { return ref>_actual_till; };
 
 	hashcode_t hashcode( ) const
 	{
-		return (_src_id^(_mcast_id<<16)) ^ (0xFFFF&_mcast_id) ^ _from ^ _seq;
+		return ((_src_id<<8)^(_mcast_id<<16)) ^ (0xFFFF&_mcast_id) ^ _seq;
 	}
+
+	node_t	_src_id;
+	mcast_t _mcast_id;
+	uint32_t _seq;
 };
 
-class DtcastMessageQueue : public AgeTable<dtcast_message_t,MESSAGE_QUEUE_CHECK_PERIOD>
+
+class DtcastMessageQueue : public AgeTable<msg_key_t,dtcast_message_t,MESSAGE_QUEUE_CHECK_PERIOD>
 {
+public:
+	DtcastMessageQueue() { _label="MQUEUE"; _debug=false; }
 	
 };
 

@@ -34,6 +34,7 @@ purge( T &list )
 	{
 		delete i->second;
 	}
+	list.clear( );
 //	while( !list.empty() )
 //	{
 //		B *tmp=list.front( );

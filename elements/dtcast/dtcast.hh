@@ -52,6 +52,9 @@ public:
 
 #define DTCAST_MCAST_NULL	0
 
+#define INFINITE			(uint32_t)(-1)
+
+
 #include "defs/algorithm.hh"
 
 #include "defs/DtcastPacket.hh"

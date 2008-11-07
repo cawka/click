@@ -23,6 +23,9 @@ CLICK_DECLS
  *
  * Receiver has NODE identificator and designated to receive MCAST stream
  *
+ * DATA packets will go on first port
+ * RouteReplies on the second one
+ *
  * =a
  * DtcastForwarder, DtcastSource
  */
@@ -31,6 +34,7 @@ class DtcastReceiver : public Element
 public:
 	DtcastReceiver( )
 			: _seq( 0 ) 
+			, _lastRTSendBy(0,0)
 	{ }
 /**
  *	@todo Add states to and Local Recovery functinality
@@ -49,6 +53,7 @@ private:
 	mcast_t _mcast;
 	
 	uint32_t _seq;
+	Timestamp _lastRTSendBy; //for local recovery thing
 };
 
 CLICK_ENDDECLS
