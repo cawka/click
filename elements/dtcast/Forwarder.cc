@@ -18,7 +18,7 @@ CLICK_DECLS
 
 DtcastForwarder::DtcastForwarder()
 	: _me(DTCAST_NODE_SELF)
-	, _source(NULL), _receiver(NULL)
+	, _activeAck( true )
 	, _refresher_source_routing(this)
 	, _refresher_forwarding(this)
 {
@@ -43,8 +43,6 @@ int DtcastForwarder::configure( Vector<String> &conf, ErrorHandler *errH )
 {
 	return cp_va_kparse( conf,this,errH,
 			"NODE",		cpkPositional, cpInteger, &_me,
-			"SOURCE",   cpkPositional, cpElement, &_source,
-			"RECEIVER", cpkPositional, cpElement, &_receiver,
 					cpEnd );
 }
 
@@ -52,10 +50,7 @@ void DtcastForwarder::push( int,Packet *pkt ) //we have only one input port
 {
 	//pkt should containt valid IP packet with protocol field set to IP_PROTO_DTCAST
 	DtcastPacket *dtcast=DtcastPacket::make( pkt );
-	if( dtcast==NULL ) { pkt->kill( ); return; }
-	
-//	ErrorHandler::default_handler()->debug( "DTCAST: valid packet (type=%d,len=%d)",
-//			dtcast->dtcast()->_type, dtcast->dtcast()->_length );
+	if( dtcast==NULL ) return;
 	
 	switch( dtcast->dtcast()->_type )
 	{
@@ -93,10 +88,10 @@ void DtcastForwarder::onRouteRequest( DtcastRRPacket *pkt )
 	
 	// forwarder node has no states. It simply maintain routing and forwarding
 	// table and rebroadcasts all necessary packets
-	_receiver->onRouteRequest( pkt );
+	output( RECEIVER ).push( pkt->clone() );
 
 	pkt->dtcast()->_from=_me;
-	output( 0 ).push( pkt );
+	output( BROADCAST ).push( pkt );
 }
 
 void DtcastForwarder::onRouteReply( DtcastRTPacket *pkt )
@@ -114,7 +109,7 @@ void DtcastForwarder::onRouteReply( DtcastRTPacket *pkt )
 
 	_forwarding.addOrUpdate( new dtcast_fwd_tuple_t(pkt->dtcast()->_mcast, pkt->dtcast()->_src) );
 
-	dtcast_fwd_tuple_t *fwd=_forwarding.get( dtcast_fwd_tuple_t(pkt->dtcast()->_mcast, pkt->dtcast()->_src) );
+	dtcast_fwd_tuple_t *fwd=_forwarding.get( fwd_key_t(pkt->dtcast()->_mcast, pkt->dtcast()->_src) );
 	if( fwd==NULL )
 	{
 		ErrorHandler::default_handler()->fatal( "DtcastForwarder::onRouteReply >> Something really wrong" );
@@ -128,23 +123,45 @@ void DtcastForwarder::onRouteReply( DtcastRTPacket *pkt )
 	
 	if( sRoute->_next_id==_me ) //source is local
 	{
-		_source->onRouteReply( pkt );
-		pkt->kill( );
+		output( SOURCE ).push( pkt );
 	}
 	else
 	{
 		pkt->next_id( sRoute->_next_id );
 		pkt->dtcast()->_from=_me;
-		output( 0 ).push( pkt );
+		output( BROADCAST ).push( pkt );
 	}
 }
 
 void DtcastForwarder::onData( DtcastDataPacket *pkt )
 {
 	if( pkt==NULL ) return;
+	dtcast_fwd_tuple_t *fwd=_forwarding.get( dtcast_fwd_tuple_t(pkt->dtcast()->_mcast, pkt->dtcast()->_src) );
+	if( fwd==NULL ) // we are not on the delivery path (haven't reveiced any RouteReplies)
+	{
+		pkt->kill( );
+		return;
+	}
+ 
+	if( _activeAck ) // broadcast ACK packet, confirming reception of data packet designated to {dsts}
+	{
+		output(BROADCAST).push( DtcastAckPacket::make(pkt->dtcast()->_src,pkt->dtcast()->_mcast,_me,
+											  pkt->dtcast()->_seq,
+											  fwd->_dsts,  //all destinations for src/mcast reachable through this node
+											  false) );
+	}
+	output( SOURCE ).push( DtcastDataWithDstsPacket::make(pkt,fwd->_dsts) ); //save packet for waiting for delivery acknowledgement
 	
+	if( fwd->needLocalDelivery() )
+	{
+		output( RECEIVER ).push( pkt->clone() );
+	}
 	
-	pkt->kill( );
+	if( fwd->needForward() )
+	{
+		pkt->dtcast()->_from=_me;
+		output( BROADCAST ).push( pkt );
+	}
 }
 
 void DtcastForwarder::onAck( DtcastAckPacket *pkt )

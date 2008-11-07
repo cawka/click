@@ -23,8 +23,9 @@ CLICK_DECLS
  *
  * Receiver has NODE identificator and designated to receive MCAST stream
  *
- * DATA packets will go on first port
- * RouteReplies on the second one
+ * input[0]  IP packets with DTCAST payload from DtcastForwarder
+ * output[0]  DATA packets
+ * output[1]  IP packets with DTCAST payload to DtcastForwarder
  *
  * =a
  * DtcastForwarder, DtcastSource
@@ -47,13 +48,18 @@ public:
 	int configure( Vector<String>&, ErrorHandler* );
 	void push( int port, Packet *pkt );
 
+protected:	
+	void onDataPacket( DtcastDataPacket *pkt );
 	void onRouteRequest( DtcastRRPacket *pkt );
+	
 private:
 	node_t  _me;
 	mcast_t _mcast;
 	
 	uint32_t _seq;
 	Timestamp _lastRTSendBy; //for local recovery thing
+	
+	enum {DATA,FORWARDER};
 };
 
 CLICK_ENDDECLS

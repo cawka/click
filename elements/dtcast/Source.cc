@@ -3,14 +3,7 @@
  */
 
 #include <click/config.h>
-#include <click/vector.hh>
-#include <click/timer.hh>
-#include <click/element.hh>
 #include <click/confparse.hh>
-#include <click/error.hh>
-#include <click/timestamp.hh>
-#include <click/timer.hh>
-#include <click/timer.hh>
 
 #include "Source.hh"
 
@@ -51,15 +44,40 @@ int DtcastSource::configure( Vector<String> &conf, ErrorHandler *errH )
 }
 
 
-void DtcastSource::push( int, Packet *pkt )
+void DtcastSource::push( int port, Packet *pkt )
 {
-	_queue.addOrUpdate( new dtcast_message_t(_me,_mcast,_me,_seq_data++,
-			Timestamp::now()+_age,
-			_dsts,
-			pkt->data(),pkt->length(),
-			false) );
-	_timer.schedule_now( );	
-	pkt->kill( );
+	if( port==DATA )
+	{
+		_queue.addOrUpdate( new dtcast_message_t(_me,_mcast,_me,_seq_data++,
+				Timestamp::now()+_age,
+				_dsts,
+				pkt->data(),pkt->length(),
+				false) );
+		_timer.schedule_now( );	
+		pkt->kill( );
+	}
+	else if( port==FORWARDER )
+	{
+		DtcastPacket *dpkt=DtcastPacket::make( pkt );
+		if( dpkt==NULL ) return;
+		
+		switch( dpkt->dtcast()->_type )
+		{
+		case DTCAST_TYPE_DATA:
+			onData( DtcastDataWithDstsPacket::make(dpkt) );
+			break;
+		case DTCAST_TYPE_RT:
+			onRouteReply( DtcastRTPacket::make(dpkt) );
+			break;
+		case DTCAST_TYPE_ACK:
+		case DTCAST_TYPE_ERACK: //it doesn't matter for Source node whether it is normal or epidemic routing ACK
+			onAck( DtcastAckPacket::make(dpkt) );
+			break;
+		default:
+			ErrorHandler::default_handler()->fatal( "DTCAST: DtcastSource has received not serviced packet type" );
+			break;
+		}
+	}
 }
 
 void DtcastSource::run_timer( Timer *timer )
@@ -82,9 +100,43 @@ void DtcastSource::run_timer( Timer *timer )
 	timer->reschedule_after_sec( ROUTE_REQUEST_TIME );
 }
 
-void DtcastSource::onRouteReply( DtcastRTPacket * )
+void DtcastSource::onRouteReply( DtcastRTPacket *pkt )
 {
+	if( pkt==NULL ) return;
 	/// maybe do something usefull
+	pkt->kill( );
+}
+
+void DtcastSource::onData( DtcastDataWithDstsPacket *pkt )
+{
+	if( pkt==NULL ) return;
+	if( pkt->dsts().size()!=0 )
+	{
+		_fwd_queue.addOrUpdate( new dtcast_message_t(
+					pkt->dtcast()->_src,pkt->dtcast()->_mcast,_me,pkt->dtcast()->_seq,
+					pkt->age(),
+					pkt->dsts(),
+					pkt->body(),pkt->body_len(),
+					pkt->dtcast()->_type==DTCAST_TYPE_ERDATA
+			) );
+	}
+	pkt->kill( );
+}
+
+void DtcastSource::onAck( DtcastAckPacket *pkt )
+{
+	if( pkt==NULL ) return;
+	DtcastMessageQueue &queue=_queue;
+	if( pkt->dtcast()->_src!=_me ) queue=_fwd_queue;
+	
+	dtcast_message_t *msg=queue.get( msg_key_t(pkt->dtcast()->_src,pkt->dtcast()->_mcast,pkt->dtcast()->_seq) );
+	if( msg!=NULL ) //otherwise hmm... ack received, but there is no message...
+	{
+		msg->_unack_ids-=pkt->dst_ids( ); //acknowledge receiving
+		if( msg->_unack_ids.size()==0 ) queue.erase( msg_key_t(pkt->dtcast()->_src,pkt->dtcast()->_mcast,pkt->dtcast()->_seq) );
+	}
+	
+	pkt->kill( );
 }
 
 CLICK_ENDDECLS

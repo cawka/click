@@ -51,6 +51,13 @@ class DtcastDstsTable : public AgeTable<dst_key_t,dtcast_dst_tuple_t,ROUTE_REPLY
 public:
 	DtcastDstsTable( ) { _label=" >>> DSTS"; _debug=false; }
 	
+	operator nodelist_t( ) const
+	{
+		nodelist_t list;
+		for( const_iterator it=this->begin(); it!=this->end(); it++ ) list.push_back( it->second->_dst_id );
+		return list;
+	}
+	
 };
 
 #endif

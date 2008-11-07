@@ -8,51 +8,53 @@ AddressInfo(
 elementclass UpdateIPHeader
 {
 	$src, $dst |
-	input -> StoreIPAddress($src,12)
-		  -> StoreIPAddress($dst,16)
+	input -> StoreIPAddress($src,12)     //src
+		  -> StoreIPAddress($dst,16) //dst
 		  -> SetIPChecksum
-
-//		  -> CheckIPHeader -> IPPrint("DTCAST (IP)", CONTENTS NONE)
+		  -> CheckIPHeader
 		  -> output;
 }
 
-src :: DtcastSource(   1,  131 )
-dst :: DtcastReceiver( 2,  131 )
+src :: DtcastSource(   NODE 1,  MCAST 131 )
+dst :: DtcastReceiver( NODE 2,  MCAST 131 )
 
-fwd :: DtcastForwarder( 3, src, dst )
+fwd :: DtcastForwarder( NODE 3 )
+
+cache :: DtcastCache
 
 FromDevice( eth1 ) -> 
-	class :: Classifier( 12/0800 21/8a,
-						 12/0800,
-						 12/fff0 ); //dum rule
+        class :: Classifier( 12/0800 21/8a, //DTCAST protocol
+                             12/0800 );
 
-class[0]
+class[0] // DTCAST routine
+	-> Strip(14) -> CheckIPHeader
+	-> cache
 	-> DtcastPrint("mcast->fwd")
 	-> fwd
 
-class[1] 
+class[1] // DATA packets (start tunnel)
+	-> Strip(14) -> CheckIPHeader
+	//-> IPClassifier(icmp) // just use only ICMP packets for data, discard all other packets
+	-> IPPrint("DATA->src:", CONTENTS NONE)
 	-> src // Encapsulate IP packets into DTCAST
 	-> UpdateIPHeader(127.0.0.1, 255.255.255.255) 
 	-> DtcastPrint("src->fwd  ") 
 	-> fwd
-//	-> Queue 
-//	-> ToDevice( lo );
-//	Strip(14) -> CheckIPHeader ->
-//	cache -> fwd
 
-fwd 
-	-> DtcastPrint("fwd->mcast")
+fwd[0]
+	-> DtcastPrint( "fwd->mcast" )
 	-> Discard
 
-class[2] -> dst
-dst[0] -> DtcastPrint("dst0->fwd ")->Discard
+fwd[1] -> dst
 
-dst[1] -> DtcastPrint("dst1->fwd ")-> fwd
+dst[0] // DATA packets (end tunnel)
+	-> IPPrint( "dst->DATA:",CONTENTS NONE )
+	-> Discard
 
+dst[1] 
+	-> DtcastPrint( "dst1->fwd " )
+	-> fwd
 
+fwd[2] -> [1]src
 
-//-> cache
-
-//fwd ->
-//	Discard
 

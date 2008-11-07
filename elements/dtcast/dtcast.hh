@@ -44,6 +44,19 @@ public:
 		push_back( val );
 		return *this;
 	}
+	
+	/**
+	 * @todo This operation need to be optimized. Now its very computation expensive, about O(n^2) or more
+	 */
+	nodelist_t& operator-=( const nodelist_t &l )
+	{
+		for( nodelist_t::const_iterator i=l.begin(); i!=l.end(); i++ )
+		{
+			nodelist_t::iterator val=find( this->begin(),this->end(),*i );
+			if( val!=this->end() ) this->erase( val );
+		}
+		return *this;
+	}
 };
 //typedef Vector<uint32_t> nodelist_t;
 
@@ -61,6 +74,7 @@ public:
 #include "defs/DtcastRRPacket.hh"
 #include "defs/DtcastRTPacket.hh"
 #include "defs/DtcastDataPacket.hh"
+#include "defs/DtcastDataWithDstsPacket.hh"
 #include "defs/DtcastAckPacket.hh"
 
 #include "defs/DtcastCacheTable.hh"

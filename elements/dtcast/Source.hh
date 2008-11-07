@@ -23,6 +23,10 @@ CLICK_DECLS
  * Source performs encapsulating IP packets into DTCAST protocol packets and
  * initiates data delivery
  *
+ * input[0]  DATA packets
+ * input[1]  IP packets with DTCAST payload from DtcastForwarder
+ * output[0] IP packets with DTCAST payload to DtcastForwarder
+ *
  * =a
  * DtcastForwarder, DtcastReceiver
  */
@@ -32,19 +36,22 @@ public:
 	DtcastSource( );
 	
 	const char *class_name() const { return "DtcastSource"; }
-	const char *port_count() const { return PORTS_1_1; }
+	const char *port_count() const { return "2/1"; }
 	const char *processing() const { return "h/h"; }
 
 	virtual int initialize( ErrorHandler* );
 	int configure( Vector<String>&, ErrorHandler* );
 	void push( int port, Packet *pkt );
 	
-	void onRouteReply( DtcastRTPacket *pkt );
 
 // Forwarding interface
 protected:
 	void run_timer( Timer * );
 
+	void onRouteReply( DtcastRTPacket *pkt );
+	void onData( DtcastDataWithDstsPacket *pkt );
+	void onAck( DtcastAckPacket *pkt );
+	
 private:
 	node_t  _me;
 	mcast_t _mcast;
@@ -56,9 +63,12 @@ private:
 	uint32_t _seq_rr;
 	
 	DtcastMessageQueue _queue;
+	DtcastMessageQueue _fwd_queue; ///< I'm not sure why I have divided queues
 	
 	Timer _timer;
 	Timestamp _lastRRSendBy;
+
+	enum {DATA,FORWARDER};
 };
 
 CLICK_ENDDECLS

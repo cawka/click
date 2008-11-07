@@ -25,8 +25,6 @@ struct dtcast_message_t
 	uint16_t _data_len;
 	bool _epidemic;
 	
-//	List_member<dtcast_message_t> link;
-	
 	dtcast_message_t( 
 						node_t src_id, 
 						mcast_t mcast_id, 
@@ -74,6 +72,13 @@ struct msg_key_t
 			_src_id(tuple._src_id)
 			,_mcast_id(tuple._mcast_id)
 			,_seq(tuple._seq)
+	{
+	}
+
+	msg_key_t( node_t src_id, mcast_t mcast_id, uint32_t seq )
+			:_src_id(src_id)
+			,_mcast_id(mcast_id)
+			,_seq(seq)
 	{
 	}
 

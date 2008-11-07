@@ -24,6 +24,18 @@ struct dtcast_fwd_tuple_t : public age_tuple_t<ROUTE_REPLY_MAXAGE>
 		_dsts.purgeOldRecords( NULL );
 		return _dsts.size()==0;
 	}
+	
+	bool needForward( ) const
+	{
+		for( DtcastDstsTable::const_iterator it=_dsts.begin(); it!=_dsts.end(); it++ ) if( it->second->_fw_flag ) return true;
+		return false;
+	}
+	
+	bool needLocalDelivery( ) const
+	{
+		for( DtcastDstsTable::const_iterator it=_dsts.begin(); it!=_dsts.end(); it++ ) if( !it->second->_fw_flag ) return true;
+		return false;
+	}
 };
 
 inline StringAccum& operator<<(StringAccum &os,const dtcast_fwd_tuple_t &t)
@@ -39,6 +51,10 @@ struct fwd_key_t
 			, _src_id(tuple._src_id)
 	{ }
 	
+	fwd_key_t( mcast_t mcast_id, node_t src_id )
+			: _mcast_id(mcast_id),_src_id(src_id)
+	{ }
+
 	hashcode_t hashcode( ) const
 	{
 		return (_src_id^(_mcast_id<<16)) ^ (0xFFFF&_mcast_id);

@@ -19,7 +19,6 @@ int DtcastReceiver::configure( Vector<String> &conf, ErrorHandler *errH )
 					cpEnd );
 }
 
-
 void DtcastReceiver::push( int, Packet *pkt )
 {
 	/**
@@ -27,13 +26,27 @@ void DtcastReceiver::push( int, Packet *pkt )
 	 */
 	DtcastPacket *dpkt=DtcastPacket::make( pkt );
 	if( dpkt==NULL ) return;
-
-	DtcastDataPacket *ddpkt=DtcastDataPacket::make( dpkt );
-	if( ddpkt==NULL ) return;
 	
-	output( 0 ).push( ddpkt->data_payload() );
+	switch( dpkt->dtcast()->_type )
+	{
+		case DTCAST_TYPE_DATA:
+			onDataPacket( DtcastDataPacket::make(dpkt) );
+			break;
+		case DTCAST_TYPE_RR:
+			onRouteRequest( DtcastRRPacket::make(dpkt) );
+			break;
+		default:
+			ErrorHandler::default_handler()->fatal( "DTCAST: DtcastReceiver has received not serviced packet type" );
+			break;
+	}
 }
 
+void DtcastReceiver::onDataPacket( DtcastDataPacket *pkt )
+{
+	if( pkt==NULL ) return; //will be fatal error
+	
+	output( DATA ).push( pkt->data_payload() ); // Element should be connected to IPClassify
+}
 
 void DtcastReceiver::onRouteRequest( DtcastRRPacket *pkt )
 {
@@ -42,11 +55,11 @@ void DtcastReceiver::onRouteRequest( DtcastRRPacket *pkt )
 	{
 		// special DTCAST RouteReply packet. NEXT field is set to invalid value, DST field is set to SELF node,
 		// which will indicate local delivery for forwarding table
-		output( 1 ).push( DtcastRTPacket::make(pkt->dtcast()->_src,pkt->dtcast()->_mcast,
+		output( FORWARDER ).push( DtcastRTPacket::make(pkt->dtcast()->_src,pkt->dtcast()->_mcast,
 					DTCAST_NODE_SELF,_seq++,DTCAST_NODE_ALL,nodelist_t().add( _me )) );
 	}
 	
-	//do not kill packet, because Forwarder will reuse it
+	pkt->kill( );
 }
 
 CLICK_ENDDECLS

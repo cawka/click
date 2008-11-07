@@ -24,6 +24,12 @@ CLICK_DECLS
  * Input should be IP packets with protocol IP_PROTO_DTCAST (138).
  * All non DTCAST packets will be discarded.
  *
+ * input[0]:   IP packets with DTCAST protocol payload
+ *
+ * output[0]:  IP packets designated for broadcasting
+ * output[1]:  IP packets designated to local delivery (to DtcastReceiver)
+ * output[2]:  IP packets designated to locel source (DtcastSource)
+ *
  * =a
  * DtcastSource, DtcastReceiver
  */
@@ -34,7 +40,7 @@ public:
 	~DtcastForwarder( );
 
 	const char *class_name() const { return "DtcastForwarder"; }
-	const char *port_count() const { return "1-2/1"; }
+	const char *port_count() const { return "1/3"; }
 	const char *processing() const { return "h/h"; }
 
 	virtual int initialize( ErrorHandler *errH );
@@ -54,14 +60,16 @@ protected:
 
 protected:
 	void run_timer( Timer * );
+	
+	enum {BROADCAST, RECEIVER, SOURCE};
 
 private:
 	node_t	_me;
-	DtcastSource			*_source;
-	DtcastReceiver			*_receiver;
 	
 	DtcastSRoutingTable		_source_routing;
 	DtcastForwardingTable	_forwarding;
+	
+	bool					_activeAck; ///< if true, explicit ACK messages are used
 	
 	Timer _refresher_source_routing;
 	Timer _refresher_forwarding;
