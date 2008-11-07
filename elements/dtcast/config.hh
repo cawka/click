@@ -7,6 +7,11 @@
 
 
 /**
+ * Maximum age for tuples in cache
+ */
+#define CACHE_TIME_TO_LIVE		60
+		
+/**
     Default age of the data messages
 */
 #define MESSAGE_DEFAULT_AGE     3600    /* 1hour */

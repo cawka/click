@@ -18,9 +18,7 @@ elementclass UpdateIPHeader
 src :: DtcastSource(   NODE 1,  MCAST 131 )
 dst :: DtcastReceiver( NODE 2,  MCAST 131 )
 
-fwd :: DtcastForwarder( NODE 3 )
-
-cache :: DtcastCache
+fwd :: DtcastForwarder( NODE 3, ACTIVE_ACK true)
 
 FromDevice( eth1 ) -> 
         class :: Classifier( 12/0800 21/8a, //DTCAST protocol
@@ -28,7 +26,6 @@ FromDevice( eth1 ) ->
 
 class[0] // DTCAST routine
 	-> Strip(14) -> CheckIPHeader
-	-> cache
 	-> DtcastPrint("mcast->fwd")
 	-> fwd
 

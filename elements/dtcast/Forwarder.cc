@@ -11,16 +11,17 @@
 #include "Forwarder.hh"
 CLICK_DECLS
 
-//void callbackHelper( Timer *timer, void *param )
-//{
-//	((Purger*)param)->purgeOldRecords( timer );
-//};
+void callbackHelper( Timer *timer, void *param )
+{
+	((Purger*)param)->purgeOldRecords( timer );
+};
 
 DtcastForwarder::DtcastForwarder()
 	: _me(DTCAST_NODE_SELF)
 	, _activeAck( true )
-	, _refresher_source_routing(this)
-	, _refresher_forwarding(this)
+	, _refresher_source_routing(callbackHelper, &_source_routing)
+	, _refresher_forwarding(callbackHelper, &_forwarding)
+	, _refresher_cache(callbackHelper, &_cache)
 {
 }
 
@@ -32,9 +33,11 @@ int DtcastForwarder::initialize( ErrorHandler* )
 {
 	_refresher_source_routing.initialize( this );
 	_refresher_forwarding.    initialize( this );
+	_refresher_cache.		  initialize( this );
 
 	_refresher_source_routing.schedule_now( );
 	_refresher_forwarding.    schedule_now( );
+	_refresher_cache.         schedule_now( );
 	
 	return 0;
 }
@@ -42,7 +45,8 @@ int DtcastForwarder::initialize( ErrorHandler* )
 int DtcastForwarder::configure( Vector<String> &conf, ErrorHandler *errH )
 {
 	return cp_va_kparse( conf,this,errH,
-			"NODE",		cpkPositional, cpInteger, &_me,
+			"NODE",	cpkPositional, cpInteger, &_me,
+			"ACTIVE_ACK", cpkNormal | cpkMandatory, cpBool, &_activeAck,
 					cpEnd );
 }
 
@@ -51,7 +55,15 @@ void DtcastForwarder::push( int,Packet *pkt ) //we have only one input port
 	//pkt should containt valid IP packet with protocol field set to IP_PROTO_DTCAST
 	DtcastPacket *dtcast=DtcastPacket::make( pkt );
 	if( dtcast==NULL ) return;
-	
+	if( _cache.receivedFromDifferentNode(*dtcast) ) 
+	{
+		if( !_activeAck && dtcast->dtcast()->_type==DTCAST_TYPE_DATA )
+			onImplicitAck(  DtcastDataPacket::make(dtcast) );
+		else
+			pkt->kill(); 
+		return; 
+	}
+
 	switch( dtcast->dtcast()->_type )
 	{
 		case DTCAST_TYPE_RR:
@@ -142,19 +154,45 @@ void DtcastForwarder::onData( DtcastDataPacket *pkt )
 		pkt->kill( );
 		return;
 	}
+	
+	dtcast_cache_tuple_t *cache=_cache.get( cache_key_t(*pkt) );
  
-	if( _activeAck ) // broadcast ACK packet, confirming reception of data packet designated to {dsts}
-	{
-		output(BROADCAST).push( DtcastAckPacket::make(pkt->dtcast()->_src,pkt->dtcast()->_mcast,_me,
+	if( pkt->dtcast()->_from!=DTCAST_NODE_SELF &&
+		(_activeAck || cache) )
+	{ // broadcast ACK packet, confirming reception of data packet designated to {dsts}
+	  //
+	  // Send ACK when explicit ACKs are specified and if we have already received same
+	  // DATA message from same source earlier unless we are receiving DATA from the own Source
+		output(BROADCAST).push( DtcastAckPacket::make(pkt->dtcast()->_src,
+											  pkt->dtcast()->_mcast,_me,
 											  pkt->dtcast()->_seq,
 											  fwd->_dsts,  //all destinations for src/mcast reachable through this node
 											  false) );
 	}
+	
+	if( cache && pkt->dtcast()->_from!=DTCAST_NODE_SELF )
+	{
+		pkt->kill( ); //if it is duplicate DATA and this DATA is not from the SOURCE, 
+					  //then do not propagate this data message anywhere
+		return;
+	}
+	
+	
+	
 	output( SOURCE ).push( DtcastDataWithDstsPacket::make(pkt,fwd->_dsts) ); //save packet for waiting for delivery acknowledgement
 	
 	if( fwd->needLocalDelivery() )
 	{
 		output( RECEIVER ).push( pkt->clone() );
+
+		if( pkt->dtcast()->_from==DTCAST_NODE_SELF )
+		{ // send local ACKs to the source for local delivered 
+			onAck( DtcastAckPacket::make( pkt->dtcast()->_src,
+										  pkt->dtcast()->_mcast,_me,
+										  pkt->dtcast()->_seq,
+										  fwd->local_dsts(),  //all destinations for src/mcast reachable through this node
+										  false) );
+		}
 	}
 	
 	if( fwd->needForward() )
@@ -167,6 +205,14 @@ void DtcastForwarder::onData( DtcastDataPacket *pkt )
 void DtcastForwarder::onAck( DtcastAckPacket *pkt )
 {
 	if( pkt==NULL ) return;
+
+	output( SOURCE ).push( pkt ); //just forward to the source
+}
+
+void DtcastForwarder::onImplicitAck( DtcastDataPacket *pkt )
+{
+	if( pkt==NULL ) return;
+	// not yet formalized what to do in this step
 	
 	pkt->kill( );
 }
@@ -183,27 +229,6 @@ void DtcastForwarder::onERAck( DtcastAckPacket *pkt )
 	if( pkt==NULL ) return;
 	
 	pkt->kill( );
-}
-
-
-void DtcastForwarder::onRefreshSRouting( Timer *timer )
-{
-	_forwarding.purgeOldRecords( NULL );
-	timer->reschedule_after_sec( ROUTE_REQUEST_TIME );
-}
-
-void DtcastForwarder::onRefreshForwarding( Timer *timer )
-{
-	_source_routing.purgeOldRecords( NULL );
-	timer->reschedule_after_sec( ROUTE_REQUEST_TIME );
-}
-
-void DtcastForwarder::run_timer( Timer *timer )
-{
-	if( timer==&this->_refresher_forwarding )
-		onRefreshForwarding( timer );
-	else if( timer==&this->_refresher_source_routing )
-		onRefreshSRouting( timer );
 }
 
 CLICK_ENDDECLS

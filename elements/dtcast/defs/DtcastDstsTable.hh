@@ -58,6 +58,13 @@ public:
 		return list;
 	}
 	
+	nodelist_t local_dsts( ) const 
+	{ 
+		nodelist_t list;
+		for( const_iterator it=this->begin(); it!=this->end(); it++ ) 
+			if( !it->second->_fw_flag ) list.push_back( it->second->_dst_id );
+		return list;
+	}
 };
 
 #endif

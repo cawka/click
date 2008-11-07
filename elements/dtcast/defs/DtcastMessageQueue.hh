@@ -68,8 +68,7 @@ inline StringAccum& operator<<(StringAccum &os,const dtcast_message_t &t)
 struct msg_key_t
 {
 	msg_key_t( const dtcast_message_t &tuple )
-			:
-			_src_id(tuple._src_id)
+			:_src_id(tuple._src_id)
 			,_mcast_id(tuple._mcast_id)
 			,_seq(tuple._seq)
 	{

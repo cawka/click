@@ -36,6 +36,8 @@ struct dtcast_fwd_tuple_t : public age_tuple_t<ROUTE_REPLY_MAXAGE>
 		for( DtcastDstsTable::const_iterator it=_dsts.begin(); it!=_dsts.end(); it++ ) if( !it->second->_fw_flag ) return true;
 		return false;
 	}
+	
+	nodelist_t local_dsts( ) const { return _dsts.local_dsts(); }
 };
 
 inline StringAccum& operator<<(StringAccum &os,const dtcast_fwd_tuple_t &t)

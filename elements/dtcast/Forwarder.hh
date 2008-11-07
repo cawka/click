@@ -52,27 +52,32 @@ protected:
 	void onRouteReply( DtcastRTPacket* );
 	void onData( DtcastDataPacket* );
 	void onAck( DtcastAckPacket* );
+	void onImplicitAck( DtcastDataPacket* );
 	void onERData( DtcastDataPacket* );
 	void onERAck( DtcastAckPacket* );
 
-	void onRefreshSRouting( Timer *timer );
-	void onRefreshForwarding( Timer *timer );
+//	void onRefreshSRouting( Timer *timer );
+//	void onRefreshForwarding( Timer *timer );
 
 protected:
-	void run_timer( Timer * );
+//	void run_timer( Timer * );
 	
 	enum {BROADCAST, RECEIVER, SOURCE};
 
 private:
 	node_t	_me;
 	
+	DtcastCacheTable		_cache;
 	DtcastSRoutingTable		_source_routing;
 	DtcastForwardingTable	_forwarding;
 	
 	bool					_activeAck; ///< if true, explicit ACK messages are used
+										///< on receiving duplicate DATA we always
+										///< use explicit ACKs
 	
 	Timer _refresher_source_routing;
 	Timer _refresher_forwarding;
+	Timer _refresher_cache;
 };
 
 CLICK_ENDDECLS

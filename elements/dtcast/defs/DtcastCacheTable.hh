@@ -8,72 +8,126 @@
 #include <click/list.hh>
 #include <click/algorithm.hh>
 
-struct dtcast_cache_tuple_t
+#include "DtcastPacket.hh"
+
+struct dtcast_cache_tuple_t : public age_tuple_t<CACHE_TIME_TO_LIVE>
 {
 	node_t		_src_id;
 	mcast_t		_mcast_id;
+	node_t		_from_id;
 	uint16_t	_type;
 	uint32_t	_seq;
 	
-	List_member<dtcast_cache_tuple_t> link;
-	
-	dtcast_cache_tuple_t( node_t src_id, mcast_t mcast_id, uint16_t type, uint32_t seq )
-			: _src_id(src_id),_mcast_id(mcast_id),_type(type),_seq(seq)
+	dtcast_cache_tuple_t( node_t src_id, mcast_t mcast_id, node_t from_id, 
+						  uint16_t type, uint32_t seq )
+			:_src_id(src_id)
+			,_mcast_id(mcast_id)
+			,_from_id(from_id)
+			,_type(type)
+			,_seq(seq)
 	{
-		
 	}
+};
+
+inline StringAccum& operator<<( StringAccum &os,const dtcast_cache_tuple_t &t )
+{
+	return os << "type=" << t._type 
+			  << ",seq=" << t._seq << ",mcast=" << t._mcast_id << ",src="  << t._src_id
+			  << ",remains=" << (ROUTE_REQUEST_MAXAGE+(t._last_update-Timestamp::now()).sec()) << "sec";
+}
+
+struct cache_key_t
+{
+	cache_key_t( const dtcast_cache_tuple_t &tuple )
+			:_src_id(tuple._src_id)
+			,_mcast_id(tuple._mcast_id)
+			,_type(tuple._type)
+			,_seq(tuple._seq)
+	{ }
 	
-	bool operator==( const dtcast_cache_tuple_t &tuple ) const
+	cache_key_t( node_t src_id, mcast_t mcast_id, uint16_t type, uint32_t seq )
+			:_src_id(src_id)
+			,_mcast_id(mcast_id)
+			,_type(type)
+			,_seq(seq)
+	{ }
+	
+	cache_key_t( DtcastPacket &pkt )
+			:_src_id(pkt.dtcast()->_src)
+			,_mcast_id(pkt.dtcast()->_mcast)
+			,_type(pkt.dtcast()->_type)
+			,_seq(pkt.dtcast()->_seq)
+	{ }
+
+	hashcode_t hashcode( ) const
+	{
+		return ((_src_id<<8)^(_mcast_id<<16)) ^ (0xFFFF&_mcast_id) ^ _seq ^ (_type<<24);
+	}
+
+	bool operator==( const cache_key_t &tuple ) const
 	{
 		return	tuple._src_id  ==_src_id		&&
 				tuple._mcast_id==_mcast_id		&&
 				tuple._type    ==_type			&&
 				tuple._seq     ==_seq;
 	}
+	
+	
+	node_t		_src_id;
+	mcast_t		_mcast_id;
+	uint16_t	_type;
+	uint32_t	_seq;
 };
 
 
-class DtcastCacheTable
+class DtcastCacheTable : public AgeTable<cache_key_t,dtcast_cache_tuple_t,CACHE_TIME_TO_LIVE>
 {
 public:
-	bool hasTuple( node_t src_id, mcast_t mcast_id, uint16_t type, uint32_t seq )
-	{
-		dtcast_cache_tuple_t *tuple=new dtcast_cache_tuple_t( src_id,mcast_id,type,seq );
-		
-		bool found=findTuple( *tuple );
-		if( found )
-			delete tuple;
-		else
-		{
-			if( _table.size()>=CACHE_TABLE_MAX_SIZE )
-			{
-				dtcast_cache_tuple_t *tmp=_table.front( );
-				_table.pop_front( );
-				delete tmp;
-			}
-			_table.push_back( tuple );
-		}
-		
-		return found;
-	}
+	DtcastCacheTable(){ _label="CACHE", _debug=false; }
 	
-	~DtcastCacheTable( )
+	bool receivedFromDifferentNode( DtcastPacket &pkt )
 	{
-		purgeList<dtcast_cache_tuple_t>( _table );
+		dtcast_cache_tuple_t *t=get( cache_key_t(pkt) );
+		return t && t->_from_id!=pkt.dtcast()->_from;
 	}
-	
-private:
-	bool findTuple( const dtcast_cache_tuple_t &tuple )
-	{
-		/**
-		 *	@todo Optimize cache searching
-		 */
-		return find( _table.begin(),_table.end(),tuple )!=_table.end( );
-	}
-	
-private:
-	typedef List<dtcast_cache_tuple_t,&dtcast_cache_tuple_t::link> list_t;
-	list_t _table;
+//	bool hasTuple( node_t src_id, mcast_t mcast_id, uint16_t type, uint32_t seq )
+//	{
+//		dtcast_cache_tuple_t *tuple=new dtcast_cache_tuple_t( src_id,mcast_id,type,seq );
+//		
+//		bool found=findTuple( *tuple );
+//		if( found )
+//			delete tuple;
+//		else
+//		{
+//			if( _table.size()>=CACHE_TABLE_MAX_SIZE )
+//			{
+//				dtcast_cache_tuple_t *tmp=_table.front( );
+//				_table.pop_front( );
+//				delete tmp;
+//			}
+//			_table.push_back( tuple );
+//		}
+//		
+//		return found;
+//	}
+//	
+//	~DtcastCacheTable( )
+//	{
+//		purgeList<dtcast_cache_tuple_t>( _table );
+//	}
+//	
+//private:
+//	bool findTuple( const dtcast_cache_tuple_t &tuple )
+//	{
+//		/**
+//		 *	@todo Optimize cache searching
+//		 */
+//		return find( _table.begin(),_table.end(),tuple )!=_table.end( );
+//	}
+//	
+//private:
+//	typedef List<dtcast_cache_tuple_t,&dtcast_cache_tuple_t::link> list_t;
+//	list_t _table;
 };
 
 #endif
