@@ -27,20 +27,55 @@ int DtcastSource::initialize( ErrorHandler* )
 	return 0;
 }
 
+#if !CLICK_TOOL
+#define CP_CONTEXT , const Element *
+#else
+#define CP_CONTEXT
+#endif
+
+static void cp_nodelist_parse( cp_value *v, const String &str, ErrorHandler *errH, 
+		const char * CP_CONTEXT )
+{
+	nodelist_t *list=(nodelist_t*)v->store;
+	
+	Vector<String> dsts;
+	cp_spacevec( str, dsts );
+	if( dsts.size()==0 ) 
+	{
+		errH->fatal( "Destinations argument should contain some values" );
+		return;
+	}
+	
+	for( Vector<String>::iterator i=dsts.begin(); i!=dsts.end(); i++ )
+	{
+		uint32_t tmp=atoi( (*i).c_str() );
+		if( tmp>0 ) 
+		{
+			list->push_back( tmp );
+		}
+		else
+		{
+			errH->fatal( "Destinations argument should contain only integer values > 0" );
+			return;
+		}
+	}
+}
+
+static void do_nothing( cp_value *	CP_CONTEXT ) { }
+
+#define cpNodelist	"nodelist"
+
 int DtcastSource::configure( Vector<String> &conf, ErrorHandler *errH )
 {
+	cp_register_argtype( cpNodelist, "Nodelist", 0, cp_nodelist_parse, do_nothing, NULL );
+	
 	Vector<String> dsts;
 	return cp_va_kparse( conf,this,errH,
 			"NODE",  cpkPositional, cpInteger, &_me,
 			"MCAST", cpkPositional, cpInteger, &_mcast,
-			"AGE",   cpkNormal,     cpTimestamp, &_age,
-			"DST",   cpkNormal,		cpArguments, &dsts,
+			"AGE",   cpkPositional, cpTimestamp,&_age,
+			"DST",   cpkPositional, cpNodelist, &_dsts,
 					 cpEnd );
-	for( Vector<String>::iterator i=dsts.begin(); i!=dsts.end(); i++ )
-	{
-		uint32_t tmp;
-		if( (tmp=atoi((*i).c_str())) ) _dsts.push_back( tmp );
-	}
 }
 
 
@@ -91,10 +126,10 @@ void DtcastSource::run_timer( Timer *timer )
 			_lastRRSendBy=Timestamp::now();
 		}
 		
-//		for( DtcastMessageQueue::iterator i=_queue.begin(); i!=_queue.end(); i++ )
-//		{
-//			output( 0 ).push( DtcastDataPacket::make(*i) );
-//		}
+		for( DtcastMessageQueue::iterator i=_queue.begin(); i!=_queue.end(); i++ )
+		{
+			output( 0 ).push( DtcastDataPacket::make(*(i->second)) );
+		}
 	}
 	
 	timer->reschedule_after_sec( ROUTE_REQUEST_TIME );

@@ -27,6 +27,14 @@ struct dtcast_cache_tuple_t : public age_tuple_t<CACHE_TIME_TO_LIVE>
 			,_seq(seq)
 	{
 	}
+
+	dtcast_cache_tuple_t( const DtcastPacket &pkt )
+			:_src_id(pkt.dtcast()->_src)
+			,_mcast_id(pkt.dtcast()->_mcast)
+			,_from_id(pkt.dtcast()->_from)
+			,_type(pkt.dtcast()->_type)
+			,_seq(pkt.dtcast()->_seq)
+	{ }
 };
 
 inline StringAccum& operator<<( StringAccum &os,const dtcast_cache_tuple_t &t )
@@ -88,46 +96,9 @@ public:
 	bool receivedFromDifferentNode( DtcastPacket &pkt )
 	{
 		dtcast_cache_tuple_t *t=get( cache_key_t(pkt) );
+		if( !t ) this->addOrUpdate( new dtcast_cache_tuple_t(pkt) );
 		return t && t->_from_id!=pkt.dtcast()->_from;
 	}
-//	bool hasTuple( node_t src_id, mcast_t mcast_id, uint16_t type, uint32_t seq )
-//	{
-//		dtcast_cache_tuple_t *tuple=new dtcast_cache_tuple_t( src_id,mcast_id,type,seq );
-//		
-//		bool found=findTuple( *tuple );
-//		if( found )
-//			delete tuple;
-//		else
-//		{
-//			if( _table.size()>=CACHE_TABLE_MAX_SIZE )
-//			{
-//				dtcast_cache_tuple_t *tmp=_table.front( );
-//				_table.pop_front( );
-//				delete tmp;
-//			}
-//			_table.push_back( tuple );
-//		}
-//		
-//		return found;
-//	}
-//	
-//	~DtcastCacheTable( )
-//	{
-//		purgeList<dtcast_cache_tuple_t>( _table );
-//	}
-//	
-//private:
-//	bool findTuple( const dtcast_cache_tuple_t &tuple )
-//	{
-//		/**
-//		 *	@todo Optimize cache searching
-//		 */
-//		return find( _table.begin(),_table.end(),tuple )!=_table.end( );
-//	}
-//	
-//private:
-//	typedef List<dtcast_cache_tuple_t,&dtcast_cache_tuple_t::link> list_t;
-//	list_t _table;
 };
 
 #endif

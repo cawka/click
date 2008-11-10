@@ -34,6 +34,7 @@ class Purger
 {
 public:
 	virtual void purgeOldRecords( Timer *timer )=0;
+        virtual ~Purger( ) { };
 };
 
 template<class key_t, class tuple_t,const int MAXAGE>
@@ -63,19 +64,19 @@ public:
 		}
 	}
 	
-	~AgeTable( )
+	virtual ~AgeTable( )
 	{
 		purge<tuple_t>( *this );
 	}
 	
 	virtual void purgeOldRecords( Timer *timer )
 	{
-		iterator i=find( this->begin(),this->end(),
-						 &tuple_t::canPurge,Timestamp::now() );
+		iterator i=::find( this->begin(),this->end(),
+				 &tuple_t::canPurge,Timestamp::now() );
 		while( i!=this->end() )
 		{
 			i=this->erase( i );
-			i=find( i,this->end(),
+			i=::find( i,this->end(),
 					&tuple_t::canPurge,Timestamp::now() );
 		}
 		if( timer ) timer->reschedule_after_sec( MAXAGE );

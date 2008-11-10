@@ -177,12 +177,23 @@ void DtcastForwarder::onData( DtcastDataPacket *pkt )
 		return;
 	}
 	
+	if( pkt->dtcast()->_from!=DTCAST_NODE_SELF ) //packet is already saved
+		output( SOURCE ).push( DtcastDataWithDstsPacket::make(pkt,fwd->_dsts) ); //save packet for waiting for delivery acknowledgement
 	
-	
-	output( SOURCE ).push( DtcastDataWithDstsPacket::make(pkt,fwd->_dsts) ); //save packet for waiting for delivery acknowledgement
-	
+	if( fwd->needForward() )
+	{
+		pkt->dtcast()->_from=_me;
+		output( BROADCAST ).push( pkt );
+	}
+
 	if( fwd->needLocalDelivery() )
 	{
+		if( cache ) //we already have delivered packet to local receiver
+		{
+			pkt->kill( );
+			return;
+		}
+			
 		output( RECEIVER ).push( pkt->clone() );
 
 		if( pkt->dtcast()->_from==DTCAST_NODE_SELF )
@@ -193,12 +204,6 @@ void DtcastForwarder::onData( DtcastDataPacket *pkt )
 										  fwd->local_dsts(),  //all destinations for src/mcast reachable through this node
 										  false) );
 		}
-	}
-	
-	if( fwd->needForward() )
-	{
-		pkt->dtcast()->_from=_me;
-		output( BROADCAST ).push( pkt );
 	}
 }
 

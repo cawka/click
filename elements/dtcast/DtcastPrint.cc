@@ -6,7 +6,7 @@
 #include <click/confparse.hh>
 #include <click/error.hh>
 
-#include "Print.hh"
+#include "DtcastPrint.hh"
 CLICK_DECLS
 
 

@@ -61,7 +61,7 @@ public:
 //typedef Vector<uint32_t> nodelist_t;
 
 #define DTCAST_NODE_SELF	0
-#define DTCAST_NODE_ALL		(-1)
+#define DTCAST_NODE_ALL		(0xFFFFFFFF)
 
 #define DTCAST_MCAST_NULL	0
 

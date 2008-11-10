@@ -40,7 +40,7 @@ public:
 	
 	static DtcastDataPacket* make( dtcast_message_t &msg )
 	{
-		return make( msg._src_id ,msg._mcast_id,msg._from,
+		return make( msg._src_id ,msg._mcast_id,DTCAST_NODE_SELF,//msg._from,
 				msg._seq,
 				msg._actual_till.sec(),
 				msg._data, msg._data_len,

@@ -67,6 +67,7 @@ public: //non-static methods
 
 	unsigned char *dtcast_payload( ) { return data()+sizeof(click_ip)+sizeof(dtcast_header_t); }
 	dtcast_header_t* dtcast( ) { return reinterpret_cast<dtcast_header_t*>( data()+sizeof(click_ip) ); };
+	const dtcast_header_t* dtcast( ) const { return reinterpret_cast<dtcast_header_t*>( data()+sizeof(click_ip) ); };
 	
 	uint8_t   ttl( ) { return ip_header()->ip_ttl; }
 
