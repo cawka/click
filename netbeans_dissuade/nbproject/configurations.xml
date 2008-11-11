@@ -4,6 +4,8 @@
     <logicalFolder name="f1" displayName="dissuade" projectFiles="true">
       <itemPath>/Users/cawka/Botan/cs218/dtcast/click/elements/dissuade/dropper.cc</itemPath>
       <itemPath>/Users/cawka/Botan/cs218/dtcast/click/elements/dissuade/dropper.hh</itemPath>
+      <itemPath>/Users/cawka/Botan/cs218/dtcast/click/elements/dissuade/PacketReorder.cc</itemPath>
+      <itemPath>/Users/cawka/Botan/cs218/dtcast/click/elements/dissuade/PacketReorder.hh</itemPath>
       <itemPath>/Users/cawka/Botan/cs218/dtcast/click/elements/dissuade/TCPForger.cc</itemPath>
       <itemPath>/Users/cawka/Botan/cs218/dtcast/click/elements/dissuade/TCPForger.hh</itemPath>
     </logicalFolder>
@@ -1483,8 +1485,8 @@
       </toolsSet>
       <makefileType>
         <makeTool>
-          <buildCommandWorkingDir>/Users/cawka/Devel/dtcast_click</buildCommandWorkingDir>
-          <buildCommand>make -f Makefile</buildCommand>
+          <buildCommandWorkingDir>/Users/cawka/Botan/cs218/dtcast/click/</buildCommandWorkingDir>
+          <buildCommand>make -f /Users/cawka/Botan/cs218/dtcast/click/Makefile</buildCommand>
           <cleanCommand>make -f Makefile clean</cleanCommand>
           <executablePath></executablePath>
           <cCompilerTool>
@@ -5400,6 +5402,12 @@
       </item>
       <item path="../../../../../../../Devel/dtcast_click/userlevel/elements.cc">
         <itemTool>1</itemTool>
+      </item>
+      <item path="/Users/cawka/Botan/cs218/dtcast/click/elements/dissuade/PacketReorder.cc">
+        <itemTool>1</itemTool>
+      </item>
+      <item path="/Users/cawka/Botan/cs218/dtcast/click/elements/dissuade/PacketReorder.hh">
+        <itemTool>3</itemTool>
       </item>
       <item path="/Users/cawka/Botan/cs218/dtcast/click/elements/dissuade/TCPForger.cc">
         <itemTool>1</itemTool>

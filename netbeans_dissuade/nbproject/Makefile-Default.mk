@@ -41,14 +41,14 @@ LDLIBSOPTIONS=
 
 # Build Targets
 .build-conf: ${BUILD_SUBPROJECTS} 
-	cd /Users/cawka/Devel/dtcast_click && make -f Makefile
+	cd /Users/cawka/Botan/cs218/dtcast/click/ && make -f /Users/cawka/Botan/cs218/dtcast/click/Makefile
 
 # Subprojects
 .build-subprojects:
 
 # Clean Targets
 .clean-conf:
-	cd /Users/cawka/Devel/dtcast_click && make -f Makefile clean
+	cd /Users/cawka/Botan/cs218/dtcast/click/ && make -f Makefile clean
 
 # Subprojects
 .clean-subprojects:
