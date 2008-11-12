@@ -202,6 +202,12 @@ void DtcastForwarder::onData( DtcastDataPacket *pkt )
 	if( fwd->needLocalDelivery() ) 
 	{
 		output( RECEIVER ).push( pkt->clone() );
+		// send local ACKs to the source for local delivered 
+		onAck( DtcastAckPacket::make( pkt->dtcast()->_src,
+									  pkt->dtcast()->_mcast,_me,
+									  pkt->dtcast()->_seq,
+									  fwd->local_dsts(),  //all destinations for src/mcast reachable through this node
+									  false) );
 	}
 
 	if( fwd->needForward() )

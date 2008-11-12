@@ -25,14 +25,14 @@ public:
 		DtcastDataWithDstsPacket *pkt=static_cast<DtcastDataWithDstsPacket*>( DtcastPacket::make(
 				src,mcast,from, epidemic?DTCAST_ERDATA_TTL:DTCAST_DATA_TTL, 
 				DTCAST_TYPE_DATA,epidemic?DTCAST_FLAG_EPIDEMIC:0, seq, 
-				sizeof(node_t)+sizeof(age_t)+sizeof(uint16_t)+body_len+dsts.size()*sizeof(node_t)) );
+				sizeof(age_t)+sizeof(uint16_t)+body_len+dsts.size()*sizeof(node_t)) );
 
 		unsigned char *data=pkt->dtcast_payload( );
 
 		memcpy( data,&age,sizeof(age_t) );
-		uint16_t offset=sizeof(node_t);
+		uint16_t offset=sizeof(age_t);
 
-		*((uint16_t*)(data+offset))=body_len;
+		memcpy( data+offset,&body_len,sizeof(uint16_t) );
 		offset+=sizeof(uint16_t);
 		
 		memcpy( data+offset,body,body_len );
@@ -68,7 +68,7 @@ public: //non-static methods
 	{
 		nodelist_t ret;
 		for( uint16_t offset=sizeof(age_t)+sizeof(uint16_t)+body_len(); 
-			 offset<dtcast()->_length; offset+=sizeof(node_t) )
+			 offset < dtcast()->_length; offset+=sizeof(node_t) )
 		{
 			ret.push_back( *( (node_t*)(dtcast_payload()+offset) ) );
 		}

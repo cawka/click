@@ -32,9 +32,9 @@
 /**
     
 */
-#define TIMEOUT_ER_START        2	  ///< Timeout to start epidemic data delivery (TIMEOUT 2)
-#define TIMEOUT_ER_RESEND		5	  ///< Timeout to epidemicly resend data packet
-#define TIMEOUT_ER_STOP			10	  ///< Maximum time in seconds to perform epidemic data dissemination
+#define TIMEOUT_ER_START        10	  ///< Timeout to start epidemic data delivery (TIMEOUT 2)
+#define TIMEOUT_ER_RESEND		4	  ///< Timeout to epidemicly resend data packet
+#define TIMEOUT_ER_STOP			20	  ///< Maximum time in seconds to perform epidemic data dissemination
 
 /**
     Epidemic data transfer maximum TTL

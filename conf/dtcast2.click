@@ -1,6 +1,6 @@
 AddressInfo(
   self 	  127.0.0.1 00:1f:5b:d1:65:e5,
-  mcast	  224.1.1.1 00:1f:5b:d1:65:e5
+  mcast	  224.1.1.1 00:08:74:3F:8B:69
 );
 
 elementclass UpdateIPHeader
@@ -19,25 +19,32 @@ dst :: DtcastReceiver( NODE 2,  MCAST 131 )
 
 fwd :: DtcastForwarder( NODE 2, ACTIVE_ACK true)
 
-FromDevice( lo0 ) -> 
-        class :: Classifier( 12/0800 21/8a //DTCAST protocol
-                             );
+FromDevice( en1 ) -> 
+       class :: Classifier( 12/0800 23/8a, //DTCAST protocol
+                            12/0800 );
 
 class[0] // DTCAST routine
 	-> Strip(14) -> CheckIPHeader
 	-> DtcastPrint("mcast->fwd")
 	-> fwd
 
+class[1] // DATA packets (start tunnel)
+	-> Strip(14) -> CheckIPHeader
+	-> IPClassifier(ip proto 138) // just use only ICMP packets for data, discard all other packets
+	-> DtcastPrint("mcast->fwd")
+	-> IPPrint("DATA->src:", CONTENTS NONE)
+	-> Discard
+
 
 src
 	//-> don't care about IP addreses
-	//-> DtcastPrint("src->fwd  ") 
+	-> DtcastPrint("src->fwd  ") 
 	-> fwd
 
 fwd[0]
 	-> DtcastPrint( "fwd->mcast" )
-	-> UpdateIPHeader( 164.67.226.176, 164.67.226.176 )
-//	-> IPPrint("DATA->src:", CONTENTS NONE)
+	-> UpdateIPHeader( 164.67.226.176, 164.67.226.31 )
+//	-> IPPrint("fwd->mcast", CONTENTS NONE)
 	-> EtherEncap(0x0800, self, mcast)
 	-> Queue
 	-> ToDevice( en1 )

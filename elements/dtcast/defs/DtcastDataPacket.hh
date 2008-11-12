@@ -23,12 +23,12 @@ public:
 		DtcastDataPacket *pkt=static_cast<DtcastDataPacket*>( DtcastPacket::make(
 				src,mcast,from, epidemic?DTCAST_ERDATA_TTL:DTCAST_DATA_TTL, 
 				DTCAST_TYPE_DATA, epidemic?DTCAST_FLAG_EPIDEMIC:0, seq, 
-				sizeof(node_t)+sizeof(age_t)+body_len) );
+				sizeof(age_t)+sizeof(uint16_t)+body_len) );
 
 		unsigned char *data=pkt->dtcast_payload( );
 
 		memcpy( data,&age,sizeof(age_t) );
-		uint16_t offset=sizeof(node_t);
+		uint16_t offset=sizeof(age_t);
 
 		*((uint16_t*)(data+offset))=body_len;
 		offset+=sizeof(uint16_t);
