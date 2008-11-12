@@ -23,7 +23,7 @@ public:
 		
 		DtcastAckPacket *pkt=static_cast<DtcastAckPacket*>( DtcastPacket::make(
 				src,mcast,from, epidemic?DTCAST_ERACK_TTL:DTCAST_ACK_TTL, 
-				epidemic?DTCAST_TYPE_ERACK:DTCAST_TYPE_ACK, seq, 
+				DTCAST_TYPE_ACK,epidemic?DTCAST_FLAG_EPIDEMIC:0, seq, 
 				dsts.size()*sizeof(node_t)) );
 
 		unsigned char *data=pkt->dtcast_payload( );
@@ -39,8 +39,7 @@ public:
 	static DtcastAckPacket* make( DtcastPacket *dtcast )
 	{
 		DtcastAckPacket *rr=static_cast<DtcastAckPacket*>( dtcast );
-		if( rr->dtcast()->_type!=DTCAST_TYPE_ERACK && 
-			rr->dtcast()->_type!=DTCAST_TYPE_ACK )
+		if( rr->dtcast()->_type!=DTCAST_TYPE_ACK )
 		{
 			ErrorHandler::default_handler()->fatal( "DTCAST: not ACK packet type" );
 			rr->kill( );

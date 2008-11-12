@@ -20,7 +20,7 @@ public:
 	{
 		DtcastRRPacket *pkt=static_cast<DtcastRRPacket*>( DtcastPacket::make(
 				src,mcast,from, DTCAST_RR_TTL, 
-				DTCAST_TYPE_RR, seq,0) );
+				DTCAST_TYPE_RR, 0,seq,0) );
 
 		return pkt;
 	}

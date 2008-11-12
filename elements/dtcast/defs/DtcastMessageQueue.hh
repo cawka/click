@@ -25,6 +25,10 @@ struct dtcast_message_t
 	uint16_t _data_len;
 	bool _epidemic;
 	
+	bool _isFirstTry;
+	Timestamp _firstTryTime;
+	Timestamp _lastTryTime;
+	
 	dtcast_message_t( 
 						node_t src_id, 
 						mcast_t mcast_id, 
@@ -43,6 +47,9 @@ struct dtcast_message_t
 			,_unack_ids(dst_ids)
 			,_data_len(data_len)
 			,_epidemic(epidemic)
+			,_isFirstTry(true)
+			,_firstTryTime(0,0)
+			,_lastTryTime(0,0)
 	{
 		_data=new unsigned char[_data_len];
 		memcpy( _data, data, _data_len );
@@ -55,7 +62,10 @@ struct dtcast_message_t
 	
 	void update( dtcast_message_t& ) { }
 	
-	bool canPurge( Timestamp ref ) { return ref>_actual_till; };
+	bool canPurge( Timestamp ref ) 
+	{ 
+		return (ref>_actual_till) || (!_epidemic && _unack_ids.size()==0); 
+	};
 };
 
 inline StringAccum& operator<<(StringAccum &os,const dtcast_message_t &t)
@@ -103,7 +113,6 @@ class DtcastMessageQueue : public AgeTable<msg_key_t,dtcast_message_t,MESSAGE_QU
 {
 public:
 	DtcastMessageQueue() { _label="MQUEUE"; _debug=false; }
-	
 };
 
 #endif

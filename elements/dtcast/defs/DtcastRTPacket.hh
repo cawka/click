@@ -20,7 +20,7 @@ public:
 	{
 		DtcastRTPacket *pkt=static_cast<DtcastRTPacket*>( DtcastPacket::make(
 				src,mcast,from, DTCAST_RT_TTL, 
-				DTCAST_TYPE_RT, seq, 
+				DTCAST_TYPE_RT, 0, seq, 
 				sizeof(node_t)+dsts.size()*sizeof(node_t)) );
 
 		unsigned char *data=pkt->dtcast_payload( );

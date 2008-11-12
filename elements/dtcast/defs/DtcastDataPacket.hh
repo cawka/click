@@ -22,7 +22,7 @@ public:
 	{
 		DtcastDataPacket *pkt=static_cast<DtcastDataPacket*>( DtcastPacket::make(
 				src,mcast,from, epidemic?DTCAST_ERDATA_TTL:DTCAST_DATA_TTL, 
-				epidemic?DTCAST_TYPE_ERDATA:DTCAST_TYPE_DATA, seq, 
+				DTCAST_TYPE_DATA, epidemic?DTCAST_FLAG_EPIDEMIC:0, seq, 
 				sizeof(node_t)+sizeof(age_t)+body_len) );
 
 		unsigned char *data=pkt->dtcast_payload( );
@@ -42,7 +42,7 @@ public:
 	{
 		return make( msg._src_id ,msg._mcast_id,DTCAST_NODE_SELF,//msg._from,
 				msg._seq,
-				msg._actual_till.sec(),
+				!msg._epidemic?msg._actual_till.sec():(Timestamp::now()+(msg._actual_till-Timestamp::now())/10).sec(),
 				msg._data, msg._data_len,
 				msg._epidemic
 				);
@@ -52,8 +52,7 @@ public:
 	{
 		DtcastDataPacket *rr=static_cast<DtcastDataPacket*>( dtcast );
 		
-		if( rr->dtcast()->_type!=DTCAST_TYPE_ERDATA && 
-			rr->dtcast()->_type!=DTCAST_TYPE_DATA )
+		if( rr->dtcast()->_type!=DTCAST_TYPE_DATA )
 		{
 			ErrorHandler::default_handler()->fatal( "DTCAST: not DATA packet type" );
 			rr->kill( );

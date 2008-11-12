@@ -24,7 +24,7 @@ public:
 	{
 		DtcastDataWithDstsPacket *pkt=static_cast<DtcastDataWithDstsPacket*>( DtcastPacket::make(
 				src,mcast,from, epidemic?DTCAST_ERDATA_TTL:DTCAST_DATA_TTL, 
-				epidemic?DTCAST_TYPE_ERDATA:DTCAST_TYPE_DATA, seq, 
+				DTCAST_TYPE_DATA,epidemic?DTCAST_FLAG_EPIDEMIC:0, seq, 
 				sizeof(node_t)+sizeof(age_t)+sizeof(uint16_t)+body_len+dsts.size()*sizeof(node_t)) );
 
 		unsigned char *data=pkt->dtcast_payload( );
@@ -57,7 +57,7 @@ public:
 				d->dtcast()->_seq,
 				d->age(),
 				d->body(), d->body_len(),
-				d->dtcast()->_type==DTCAST_TYPE_ERDATA,
+				d->dtcast()->_flags&DTCAST_FLAG_EPIDEMIC,
 				dsts
 				);
 	}

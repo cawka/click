@@ -24,8 +24,8 @@ CLICK_DECLS
  * Receiver has NODE identificator and designated to receive MCAST stream
  *
  * input[0]  IP packets with DTCAST payload from DtcastForwarder
- * output[0]  DATA packets
- * output[1]  IP packets with DTCAST payload to DtcastForwarder
+ * output[0]  IP packets with DTCAST payload to DtcastForwarder
+ * output[1]  DATA packets
  *
  * =a
  * DtcastForwarder, DtcastSource
@@ -35,31 +35,41 @@ class DtcastReceiver : public Element
 public:
 	DtcastReceiver( )
 			: _seq( 0 ) 
-			, _lastRTSendBy(0,0)
+			, _lastRRorData( 0,0 )
+			, _localRecoveryTimer( this )
 	{ }
-/**
- *	@todo Add states to and Local Recovery functinality
- */
 
 	const char *class_name() const { return "DtcastReceiver"; }
-	const char *port_count() const { return "1/2"; }
+	const char *port_count() const { return "1/1-2"; }
 	const char *processing() const { return "h/h"; }
 
+	virtual int initialize( ErrorHandler *errH );
 	int configure( Vector<String>&, ErrorHandler* );
 	void push( int port, Packet *pkt );
 
 protected:	
 	void onDataPacket( DtcastDataPacket *pkt );
+//	void onErDataPacket( DtcastDataPacket *pkt );
 	void onRouteRequest( DtcastRRPacket *pkt );
 	
+	void onLocalRecovery( Timer *timer );
+	
+private:
+	void run_timer( Timer *timer );
+	void scheduleLocalRecovery( DtcastPacket *pkt );
+
 private:
 	node_t  _me;
 	mcast_t _mcast;
 	
 	uint32_t _seq;
-	Timestamp _lastRTSendBy; //for local recovery thing
+	Timestamp _lastRRorData; ///< last time we have seen RouteRequest or DataPacket
+							 ///< if NOW()-_lastRRorData > THRESHOLD, then exit localRecovery state
+	node_t   _lastSrc;		 ///< Source node_id from which we received last data or RT packet
 	
-	enum {DATA,FORWARDER};
+	Timer     _localRecoveryTimer;
+	
+	enum{ FORWARDER, DATA };
 };
 
 CLICK_ENDDECLS

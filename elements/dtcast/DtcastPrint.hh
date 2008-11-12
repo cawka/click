@@ -33,6 +33,12 @@ public:
 
 	int configure( Vector<String>&, ErrorHandler* );
 	Packet* simple_action( Packet* );
+
+protected:
+	void onRouteRequest( DtcastRRPacket* );
+	void onRouteReply( DtcastRTPacket* );
+	void onData( DtcastDataPacket* );
+	void onAck( DtcastAckPacket* );
 	
 private:
 	String _label;

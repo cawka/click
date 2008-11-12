@@ -15,7 +15,8 @@
  */
 struct dtcast_header_t
 {
-	uint16_t _type;
+	uint8_t  _type;
+	uint8_t  _flags;
 	uint16_t _length;
 	uint32_t _seq;
 	node_t   _src;
@@ -74,7 +75,7 @@ public: //non-static methods
 protected:
 	static DtcastPacket* make( node_t src,mcast_t mcast, node_t from,
                 uint8_t ttl,
-                uint16_t type, uint32_t seq, 
+                uint8_t type, uint8_t flags, uint32_t seq, 
                 uint16_t length )
 	{
 		DtcastPacket *pkt=static_cast<DtcastPacket*>( Packet::make(sizeof(click_ip)+
@@ -92,6 +93,7 @@ protected:
                 
 		dtcast_header_t *header=pkt->dtcast();
 		header->_type=type; 
+		header->_flags=flags;
 		header->_length=length;
 		header->_seq=seq;
 		header->_mcast=mcast;

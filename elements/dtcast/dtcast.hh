@@ -7,6 +7,8 @@
 
 #include <click/packet.hh>
 #include <click/vector.hh>
+#include <click/string.hh>
+#include <click/straccum.hh>
 
 #include "config.hh"
 
@@ -22,8 +24,9 @@
 #define DTCAST_TYPE_RT		1
 #define DTCAST_TYPE_DATA	2
 #define DTCAST_TYPE_ACK		3
-#define DTCAST_TYPE_ERDATA	4
-#define DTCAST_TYPE_ERACK	5
+
+#define DTCAST_FLAG_EPIDEMIC	1
+#define DTCAST_FLAG_DUPLICATE   2
 
 #define DTCAST_RR_TTL	255
 #define DTCAST_RT_TTL	255
@@ -58,6 +61,16 @@ public:
 		return *this;
 	}
 };
+
+inline StringAccum &operator<<( StringAccum &os, const nodelist_t &list )
+{
+	for( nodelist_t::const_iterator i=list.begin(); i!=list.end(); i++ )
+	{
+		if( i!=list.begin() ) os << ",";
+		os << *i;
+	}
+	return os;
+}
 //typedef Vector<uint32_t> nodelist_t;
 
 #define DTCAST_NODE_SELF	0
@@ -81,5 +94,6 @@ public:
 #include "defs/DtcastSRoutingTable.hh"
 #include "defs/DtcastForwardingTable.hh"
 #include "defs/DtcastMessageQueue.hh"
+#include "defs/DtcastMcastTable.hh"
 
 #endif

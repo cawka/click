@@ -50,6 +50,7 @@ struct cache_key_t
 			:_src_id(tuple._src_id)
 			,_mcast_id(tuple._mcast_id)
 			,_type(tuple._type)
+//			,_type(tuple._type==DTCAST_TYPE_ERDATA?DTCAST_TYPE_DATA:tuple._type)
 			,_seq(tuple._seq)
 	{ }
 	
@@ -57,6 +58,7 @@ struct cache_key_t
 			:_src_id(src_id)
 			,_mcast_id(mcast_id)
 			,_type(type)
+//			,_type(type==DTCAST_TYPE_ERDATA?DTCAST_TYPE_DATA:type)
 			,_seq(seq)
 	{ }
 	
@@ -64,6 +66,7 @@ struct cache_key_t
 			:_src_id(pkt.dtcast()->_src)
 			,_mcast_id(pkt.dtcast()->_mcast)
 			,_type(pkt.dtcast()->_type)
+//			,_type(pkt.dtcast()->_type==DTCAST_TYPE_ERDATA?DTCAST_TYPE_DATA:pkt.dtcast()->_type)
 			,_seq(pkt.dtcast()->_seq)
 	{ }
 
@@ -77,9 +80,9 @@ struct cache_key_t
 		return	tuple._src_id  ==_src_id		&&
 				tuple._mcast_id==_mcast_id		&&
 				tuple._type    ==_type			&&
+//				(tuple._type==DTCAST_TYPE_ERDATA?DTCAST_TYPE_DATA:tuple._type)==_type&&
 				tuple._seq     ==_seq;
 	}
-	
 	
 	node_t		_src_id;
 	mcast_t		_mcast_id;
@@ -96,7 +99,10 @@ public:
 	bool receivedFromDifferentNode( DtcastPacket &pkt )
 	{
 		dtcast_cache_tuple_t *t=get( cache_key_t(pkt) );
-		if( !t ) this->addOrUpdate( new dtcast_cache_tuple_t(pkt) );
+		if( !t ) 
+			this->addOrUpdate( new dtcast_cache_tuple_t(pkt) );
+		else
+			pkt.dtcast()->_flags|=DTCAST_FLAG_DUPLICATE;
 		return t && t->_from_id!=pkt.dtcast()->_from;
 	}
 };

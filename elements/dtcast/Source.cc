@@ -13,10 +13,9 @@ DtcastSource::DtcastSource( )
 		: _me( DTCAST_NODE_SELF )
 		, _mcast( DTCAST_MCAST_NULL ) 
 		, _age( Timestamp::Timestamp(3600,0) ) ///< default age = 3600 seconds
-		, _seq_data(0) /// @todo change sequence number initialization for random value
+		, _seq_data(0) ///< @todo maybe change sequence number initialization for random value
 		, _seq_rr(0)
 		, _timer( this )
-		, _lastRRSendBy( 0,0 )
 {
 }
 
@@ -72,24 +71,17 @@ int DtcastSource::configure( Vector<String> &conf, ErrorHandler *errH )
 	Vector<String> dsts;
 	return cp_va_kparse( conf,this,errH,
 			"NODE",  cpkPositional, cpInteger, &_me,
-			"MCAST", cpkPositional, cpInteger, &_mcast,
-			"AGE",   cpkPositional, cpTimestamp,&_age,
-			"DST",   cpkPositional, cpNodelist, &_dsts,
+			"MCAST", cpkNormal, cpInteger, &_mcast,
+			"DST",   cpkNormal, cpNodelist, &_dsts,
+			"AGE",   cpkNormal, cpTimestamp,&_age,
 					 cpEnd );
 }
-
 
 void DtcastSource::push( int port, Packet *pkt )
 {
 	if( port==DATA )
 	{
-		_queue.addOrUpdate( new dtcast_message_t(_me,_mcast,_me,_seq_data++,
-				Timestamp::now()+_age,
-				_dsts,
-				pkt->data(),pkt->length(),
-				false) );
-		_timer.schedule_now( );	
-		pkt->kill( );
+		onInputData( pkt );
 	}
 	else if( port==FORWARDER )
 	{
@@ -105,7 +97,6 @@ void DtcastSource::push( int port, Packet *pkt )
 			onRouteReply( DtcastRTPacket::make(dpkt) );
 			break;
 		case DTCAST_TYPE_ACK:
-		case DTCAST_TYPE_ERACK: //it doesn't matter for Source node whether it is normal or epidemic routing ACK
 			onAck( DtcastAckPacket::make(dpkt) );
 			break;
 		default:
@@ -115,24 +106,15 @@ void DtcastSource::push( int port, Packet *pkt )
 	}
 }
 
-void DtcastSource::run_timer( Timer *timer )
+void DtcastSource::onInputData( Packet *pkt )
 {
-	_queue.purgeOldRecords( NULL );
-	if( !_queue.empty() )
-	{
-		if( Timestamp::now()-_lastRRSendBy>ROUTE_REQUEST_TIME )
-		{
-			output( 0 ).push( DtcastRRPacket::make(_me,_mcast,DTCAST_NODE_SELF,_seq_rr++) );
-			_lastRRSendBy=Timestamp::now();
-		}
-		
-		for( DtcastMessageQueue::iterator i=_queue.begin(); i!=_queue.end(); i++ )
-		{
-			output( 0 ).push( DtcastDataPacket::make(*(i->second)) );
-		}
-	}
-	
-	timer->reschedule_after_sec( ROUTE_REQUEST_TIME );
+	_queue.addOrUpdate( new dtcast_message_t(_me,_mcast,DTCAST_NODE_SELF,_seq_data++,
+			Timestamp::now()+_age,
+			_dsts,
+			pkt->data(),pkt->length(),
+			false) );
+	_timer.schedule_now( );	
+	pkt->kill( );
 }
 
 void DtcastSource::onRouteReply( DtcastRTPacket *pkt )
@@ -147,12 +129,14 @@ void DtcastSource::onData( DtcastDataWithDstsPacket *pkt )
 	if( pkt==NULL ) return;
 	if( pkt->dsts().size()!=0 )
 	{
-		_fwd_queue.addOrUpdate( new dtcast_message_t(
-					pkt->dtcast()->_src,pkt->dtcast()->_mcast,_me,pkt->dtcast()->_seq,
+		_queue.addOrUpdate( new dtcast_message_t(
+					_me,pkt->dtcast()->_mcast,
+				    DTCAST_NODE_SELF,
+					pkt->dtcast()->_seq,
 					pkt->age(),
 					pkt->dsts(),
 					pkt->body(),pkt->body_len(),
-					pkt->dtcast()->_type==DTCAST_TYPE_ERDATA
+					pkt->dtcast()->_flags&DTCAST_FLAG_EPIDEMIC
 			) );
 	}
 	pkt->kill( );
@@ -161,17 +145,73 @@ void DtcastSource::onData( DtcastDataWithDstsPacket *pkt )
 void DtcastSource::onAck( DtcastAckPacket *pkt )
 {
 	if( pkt==NULL ) return;
-	DtcastMessageQueue &queue=_queue;
-	if( pkt->dtcast()->_src!=_me ) queue=_fwd_queue;
 	
-	dtcast_message_t *msg=queue.get( msg_key_t(pkt->dtcast()->_src,pkt->dtcast()->_mcast,pkt->dtcast()->_seq) );
+	dtcast_message_t *msg=_queue.get( msg_key_t(pkt->dtcast()->_src,pkt->dtcast()->_mcast,pkt->dtcast()->_seq) );
 	if( msg!=NULL ) //otherwise hmm... ack received, but there is no message...
 	{
 		msg->_unack_ids-=pkt->dst_ids( ); //acknowledge receiving
-		if( msg->_unack_ids.size()==0 ) queue.erase( msg_key_t(pkt->dtcast()->_src,pkt->dtcast()->_mcast,pkt->dtcast()->_seq) );
+		// if there is no unacknowledged destinations, message will be removed from queue in
+		// the next timer cycle
 	}
 	
 	pkt->kill( );
+}
+
+void DtcastSource::run_timer( Timer *timer )
+{
+	_queue.purgeOldRecords( NULL );
+	_mcasts.purgeOldRecords( NULL );
+	if( !_queue.empty() )
+	{
+		for( DtcastMessageQueue::iterator i=_queue.begin(); i!=_queue.end(); i++ )
+		{
+			mcast_tuple_t *mcast=_mcasts.get( mcast_key_t(*i->second) );
+			if( !mcast || Timestamp::now()-mcast->_last_update>ROUTE_REQUEST_TIME )
+			{
+				output( 0 ).push( DtcastRRPacket::make(_me,i->second->_mcast_id,DTCAST_NODE_SELF,_seq_rr++) );
+				_mcasts.addOrUpdate( new mcast_tuple_t(*i->second) );
+			}
+			
+			bool broadcast=false;
+			if( !i->second->_isFirstTry && 
+				i->second->_firstTryTime+TIMEOUT_ER_START<=Timestamp::now() && //EPIDEMIC ROUTING TIMEOUT
+				i->second->_firstTryTime+TIMEOUT_ER_STOP >=Timestamp::now()	) //switch on epidemic OR update epidemic
+			{
+				if( !i->second->_epidemic || 
+					(i->second->_epidemic && i->second->_lastTryTime+TIMEOUT_ER_RESEND<Timestamp::now()) )
+				{
+					i->second->_epidemic=true;
+					broadcast=true;
+				}
+			}
+			if( i->second->_epidemic &&
+				i->second->_firstTryTime+TIMEOUT_ER_STOP<Timestamp::now() ) // switch off epidemic
+			{
+				i->second->_epidemic=false;
+			}
+			
+			if( !i->second->_epidemic && 
+				i->second->_lastTryTime+TIMEOUT_DATA_RETRANSMIT<Timestamp::now() )
+			{
+				broadcast=true;
+			}
+
+			if( i->second->_isFirstTry ) 
+			{ 
+				i->second->_firstTryTime=Timestamp::now(); 
+				i->second->_isFirstTry=false;
+				broadcast=true; 
+			}
+			
+			if( broadcast ) // finally if we need broadcast packet
+			{
+				i->second->_lastTryTime=Timestamp::now();
+				output( 0 ).push( DtcastDataPacket::make(*(i->second)) );
+			}
+		}
+	}
+	
+	timer->reschedule_after_sec( 1 );
 }
 
 CLICK_ENDDECLS

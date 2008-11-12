@@ -94,6 +94,12 @@ public:
 				os.take_string().c_str() );
 		}				
 	}
+	
+//	typename HashTable<key_t,tuple_t*>::iterator erase( const typename HashTable<key_t,tuple_t*>::iterator &it )
+//	{
+//		delete it->second;
+//		return erase( it );
+//	}
 
 //private:
 	typedef HashTable<key_t,tuple_t*> table_t;

@@ -73,16 +73,16 @@ void DtcastForwarder::push( int,Packet *pkt ) //we have only one input port
 			onRouteReply( DtcastRTPacket::make(dtcast) );
 			break;
 		case DTCAST_TYPE_DATA:
-			onData( DtcastDataPacket::make(dtcast) );
+			if( dtcast->dtcast()->_flags&DTCAST_FLAG_EPIDEMIC )
+				onERData( DtcastDataPacket::make(dtcast) );
+			else
+				onData( DtcastDataPacket::make(dtcast) );
 			break;
 		case DTCAST_TYPE_ACK:
-			onAck( DtcastAckPacket::make(dtcast) );
-			break;
-		case DTCAST_TYPE_ERDATA:
-			onERData( DtcastDataPacket::make(dtcast) );
-			break;
-		case DTCAST_TYPE_ERACK:
-			onERAck( DtcastAckPacket::make(dtcast) );
+			if( dtcast->dtcast()->_flags&DTCAST_FLAG_EPIDEMIC )
+				onERAck( DtcastAckPacket::make(dtcast) );
+			else
+				onAck( DtcastAckPacket::make(dtcast) );
 			break;
 		default:
 			ErrorHandler::default_handler()->fatal( "DTCAST: unknown packet type (%d)",dtcast->dtcast()->_type );
@@ -102,30 +102,31 @@ void DtcastForwarder::onRouteRequest( DtcastRRPacket *pkt )
 	// table and rebroadcasts all necessary packets
 	output( RECEIVER ).push( pkt->clone() );
 
-	pkt->dtcast()->_from=_me;
-	output( BROADCAST ).push( pkt );
+	broadcastPacket( pkt );
 }
 
 void DtcastForwarder::onRouteReply( DtcastRTPacket *pkt )
 {
 	if( pkt==NULL ) return;
-	if( pkt->next_id()!=_me && pkt->dtcast()->_from!=DTCAST_NODE_SELF ) { pkt->kill(); return; }
+
+	// allow if:
+	//		 - _from   == DTCAST_NODE_SELF
+	//		 - next_id == _me
+	//       - next_id == DTCAST_NODE_ALL (local recovery mode)	
+	if( pkt->next_id()      !=_me && 
+		pkt->next_id()      !=DTCAST_NODE_ALL &&
+		pkt->dtcast()->_from!=DTCAST_NODE_SELF ) 
+	{ 
+		return pkt->kill();
+	}
 
 	dtcast_srouting_tuple_t *sRoute=_source_routing.get( srouting_key_t(pkt->dtcast()->_src) );
-
-	if( !sRoute ) //hmmm, timeout or someone tries to do something wrong
-	{
-		pkt->kill( );
-		return;
-	}
+	if( !sRoute ) return pkt->kill( );//hmmm, timeout or someone tries to do something wrong
 
 	_forwarding.addOrUpdate( new dtcast_fwd_tuple_t(pkt->dtcast()->_mcast, pkt->dtcast()->_src) );
 
 	dtcast_fwd_tuple_t *fwd=_forwarding.get( fwd_key_t(pkt->dtcast()->_mcast, pkt->dtcast()->_src) );
-	if( fwd==NULL )
-	{
-		ErrorHandler::default_handler()->fatal( "DtcastForwarder::onRouteReply >> Something really wrong" );
-	}
+	assert( fwd!=NULL );
 
 	nodelist_t nodes=pkt->dst_ids( );
 	for( nodelist_t::iterator dst=nodes.begin(); dst!=nodes.end(); dst++ )
@@ -139,10 +140,34 @@ void DtcastForwarder::onRouteReply( DtcastRTPacket *pkt )
 	}
 	else
 	{
-		pkt->next_id( sRoute->_next_id );
-		pkt->dtcast()->_from=_me;
-		output( BROADCAST ).push( pkt );
+		/**
+		 * Allow one-hop flood RouteReply packets (local recovery mode)
+		 */
+		if( !(pkt->next_id()==DTCAST_NODE_ALL && pkt->dtcast()->_from==DTCAST_NODE_SELF) )
+			pkt->next_id( sRoute->_next_id );
+		
+		broadcastPacket( pkt );
 	}
+}
+
+void DtcastForwarder::onDataLocal( DtcastDataPacket *pkt, dtcast_fwd_tuple_t *fwd )
+{
+	if( fwd->needLocalDelivery() && !(pkt->dtcast()->_flags&DTCAST_FLAG_DUPLICATE) ) //we already have delivered packet to local receiver
+	{
+		output( RECEIVER ).push( pkt->clone() );
+
+		// send local ACKs to the source for local delivered 
+		onAck( DtcastAckPacket::make( pkt->dtcast()->_src,
+									  pkt->dtcast()->_mcast,_me,
+									  pkt->dtcast()->_seq,
+									  fwd->local_dsts(),  //all destinations for src/mcast reachable through this node
+									  false) );
+	}
+
+	if( fwd->needForward() )
+		broadcastPacket( pkt );
+	else
+		pkt->kill( );
 }
 
 void DtcastForwarder::onData( DtcastDataPacket *pkt )
@@ -154,11 +179,9 @@ void DtcastForwarder::onData( DtcastDataPacket *pkt )
 		pkt->kill( );
 		return;
 	}
-	
-	dtcast_cache_tuple_t *cache=_cache.get( cache_key_t(*pkt) );
+	if( pkt->dtcast()->_from==DTCAST_NODE_SELF ) return onDataLocal( pkt, fwd );
  
-	if( pkt->dtcast()->_from!=DTCAST_NODE_SELF &&
-		(_activeAck || cache) )
+	if( _activeAck || pkt->dtcast()->_flags&DTCAST_FLAG_DUPLICATE )
 	{ // broadcast ACK packet, confirming reception of data packet designated to {dsts}
 	  //
 	  // Send ACK when explicit ACKs are specified and if we have already received same
@@ -169,42 +192,22 @@ void DtcastForwarder::onData( DtcastDataPacket *pkt )
 											  fwd->_dsts,  //all destinations for src/mcast reachable through this node
 											  false) );
 	}
+	//
+	/*************/
+	if( pkt->dtcast()->_flags&DTCAST_FLAG_DUPLICATE ) return pkt->kill( ); //if it is duplicate DATA then do not propagate this data message anywhere
+	/*************/
+	//
+	output( SOURCE ).push( DtcastDataWithDstsPacket::make(pkt,fwd->_dsts) ); //save packet for waiting for delivery acknowledgement
 	
-	if( cache && pkt->dtcast()->_from!=DTCAST_NODE_SELF )
+	if( fwd->needLocalDelivery() ) 
 	{
-		pkt->kill( ); //if it is duplicate DATA and this DATA is not from the SOURCE, 
-					  //then do not propagate this data message anywhere
-		return;
-	}
-	
-	if( pkt->dtcast()->_from!=DTCAST_NODE_SELF ) //packet is already saved
-		output( SOURCE ).push( DtcastDataWithDstsPacket::make(pkt,fwd->_dsts) ); //save packet for waiting for delivery acknowledgement
-	
-	if( fwd->needForward() )
-	{
-		pkt->dtcast()->_from=_me;
-		output( BROADCAST ).push( pkt );
-	}
-
-	if( fwd->needLocalDelivery() )
-	{
-		if( cache ) //we already have delivered packet to local receiver
-		{
-			pkt->kill( );
-			return;
-		}
-			
 		output( RECEIVER ).push( pkt->clone() );
-
-		if( pkt->dtcast()->_from==DTCAST_NODE_SELF )
-		{ // send local ACKs to the source for local delivered 
-			onAck( DtcastAckPacket::make( pkt->dtcast()->_src,
-										  pkt->dtcast()->_mcast,_me,
-										  pkt->dtcast()->_seq,
-										  fwd->local_dsts(),  //all destinations for src/mcast reachable through this node
-										  false) );
-		}
 	}
+
+	if( fwd->needForward() )
+		broadcastPacket( pkt );
+	else
+		pkt->kill( );
 }
 
 void DtcastForwarder::onAck( DtcastAckPacket *pkt )
@@ -225,15 +228,32 @@ void DtcastForwarder::onImplicitAck( DtcastDataPacket *pkt )
 void DtcastForwarder::onERData( DtcastDataPacket *pkt )
 {
 	if( pkt==NULL ) return;
+	// in the epidemic mode do not consult forwarding tables, just 
+	// save packet if not from SELF, notify receiver and forward if TTL allows
+
+	/** !!!
+	 * Epidemic data packets are just rebroadcasted. No saving in the local Source
+	 */
+//	if( pkt->dtcast()->_from!=DTCAST_NODE_SELF ) //save in the source
+//		output( SOURCE ).push( DtcastDataWithDstsPacket::make(pkt,nodelist_t()) ); // save epidemic dissemination data packet
 	
-	pkt->kill( );
+	dtcast_cache_tuple_t *cache=_cache.get( cache_key_t(*pkt) );
+	if( !cache ) output( RECEIVER ).push( pkt->clone( ) ); //notify receiver
+	
+	broadcastPacket( pkt ); //rebroadcast if TTL allows
 }
 
+/**
+ * Message receiving acknowledgement 
+ * 
+ * In the epidemic mode ACK message can be generated only be appropriate Receiver
+ */
 void DtcastForwarder::onERAck( DtcastAckPacket *pkt )
 {
 	if( pkt==NULL ) return;
 	
-	pkt->kill( );
+	output( SOURCE ).push( pkt->clone() ); //notify SOURCE
+	broadcastPacket( pkt );				  //rebroadcast packet if TTL allows
 }
 
 CLICK_ENDDECLS

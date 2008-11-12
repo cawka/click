@@ -51,11 +51,19 @@ protected:
 	void onRouteRequest( DtcastRRPacket* );
 	void onRouteReply( DtcastRTPacket* );
 	void onData( DtcastDataPacket* );
+	void onDataLocal( DtcastDataPacket *pkt, dtcast_fwd_tuple_t *fwd );
 	void onAck( DtcastAckPacket* );
 	void onImplicitAck( DtcastDataPacket* );
 	void onERData( DtcastDataPacket* );
 	void onERAck( DtcastAckPacket* );
 
+	/**
+	 * If IP header TTL field is greater than 0, then decrement TTL, set dtcast::_from field to _me and
+	 * broadcast packet on BROADCAST port
+	 *
+	 * @param pkt   Packet to broadcast
+	 */
+	inline void broadcastPacket( DtcastPacket *pkt );
 //	void onRefreshSRouting( Timer *timer );
 //	void onRefreshForwarding( Timer *timer );
 
@@ -79,6 +87,16 @@ private:
 	Timer _refresher_forwarding;
 	Timer _refresher_cache;
 };
+
+void DtcastForwarder::broadcastPacket( DtcastPacket *pkt )
+{
+	if( pkt->ip_header()->ip_ttl>0 )
+	{
+		pkt->ip_header()->ip_ttl--;
+		pkt->dtcast()->_from=_me;
+		output( BROADCAST ).push( pkt );
+	}
+}
 
 CLICK_ENDDECLS
 #endif
