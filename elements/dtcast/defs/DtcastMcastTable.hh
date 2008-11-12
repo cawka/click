@@ -34,7 +34,7 @@ struct mcast_key_t
 class DtcastMcastTable : public AgeTable<mcast_key_t,mcast_tuple_t,ROUTE_REQUEST_MAXAGE>
 {
 public:
-	
+	DtcastMcastTable() { _label="MCASTS"; _debug=false; }
 };
 
 #endif

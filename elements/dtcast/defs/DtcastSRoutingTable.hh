@@ -62,7 +62,7 @@ struct srouting_key_t
 class DtcastSRoutingTable : public AgeTable<srouting_key_t,dtcast_srouting_tuple_t,ROUTE_REQUEST_MAXAGE>
 {
 public:
-	DtcastSRoutingTable() { _label="SROUTING"; _debug=true; }
+	DtcastSRoutingTable() { _label="SROUTING"; _debug=false; }
 };
 
 #endif

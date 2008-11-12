@@ -90,6 +90,10 @@ protected:
 		ip->ip_hl = sizeof(click_ip) >> 2;
 		ip->ip_v = 4;
 		ip->ip_ttl = ttl;
+		
+		ip->ip_tos = 0;
+		ip->ip_id = 0;
+		ip->ip_off = 0;
                 
 		dtcast_header_t *header=pkt->dtcast();
 		header->_type=type; 

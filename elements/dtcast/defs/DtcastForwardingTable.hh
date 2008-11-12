@@ -75,7 +75,7 @@ struct fwd_key_t
 class DtcastForwardingTable : public AgeTable<fwd_key_t,dtcast_fwd_tuple_t,ROUTE_REPLY_MAXAGE>
 {
 public:
-	DtcastForwardingTable( ) { _label="FORWARDING"; _debug=true; }
+	DtcastForwardingTable( ) { _label="FORWARDING"; _debug=false; }
 };
 
 #endif
