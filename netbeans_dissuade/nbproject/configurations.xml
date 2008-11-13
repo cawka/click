@@ -1,17 +1,7 @@
 <?xml version="1.0" encoding="UTF-8"?>
 <configurationDescriptor version="45">
   <logicalFolder name="root" displayName="root" projectFiles="true">
-    <logicalFolder name="f1" displayName="dissuade" projectFiles="true">
-      <itemPath>/Users/cawka/Botan/cs218/dtcast/click/elements/dissuade/dropper.cc</itemPath>
-      <itemPath>/Users/cawka/Botan/cs218/dtcast/click/elements/dissuade/dropper.hh</itemPath>
-      <itemPath>/Users/cawka/Botan/cs218/dtcast/click/elements/dissuade/PacketReorder.cc</itemPath>
-      <itemPath>/Users/cawka/Botan/cs218/dtcast/click/elements/dissuade/PacketReorder.hh</itemPath>
-      <itemPath>/Users/cawka/Botan/cs218/dtcast/click/elements/dissuade/TCPForger.cc</itemPath>
-      <itemPath>/Users/cawka/Botan/cs218/dtcast/click/elements/dissuade/TCPForger.hh</itemPath>
-    </logicalFolder>
-    <logicalFolder name="dtcast_click"
-                   displayName="dtcast_click"
-                   projectFiles="true">
+    <logicalFolder name="dtcast_click" displayName="click" projectFiles="true">
       <logicalFolder name="apps" displayName="apps" projectFiles="true">
         <logicalFolder name="clicky" displayName="clicky" projectFiles="true">
           <logicalFolder name="src" displayName="src" projectFiles="true">
@@ -1466,6 +1456,16 @@
       </logicalFolder>
       <itemPath>../../../../../../../Devel/dtcast_click/confdefs.h</itemPath>
       <itemPath>../../../../../../../Devel/dtcast_click/conftest.c</itemPath>
+    </logicalFolder>
+    <logicalFolder name="f1" displayName="dissuade" projectFiles="true">
+      <itemPath>/Users/cawka/Botan/cs218/dtcast/click/elements/dissuade/BandwidthAnnotator.cc</itemPath>
+      <itemPath>/Users/cawka/Botan/cs218/dtcast/click/elements/dissuade/BandwidthAnnotator.hh</itemPath>
+      <itemPath>/Users/cawka/Botan/cs218/dtcast/click/elements/dissuade/dropper.cc</itemPath>
+      <itemPath>/Users/cawka/Botan/cs218/dtcast/click/elements/dissuade/dropper.hh</itemPath>
+      <itemPath>/Users/cawka/Botan/cs218/dtcast/click/elements/dissuade/PacketReorder.cc</itemPath>
+      <itemPath>/Users/cawka/Botan/cs218/dtcast/click/elements/dissuade/PacketReorder.hh</itemPath>
+      <itemPath>/Users/cawka/Botan/cs218/dtcast/click/elements/dissuade/TCPForger.cc</itemPath>
+      <itemPath>/Users/cawka/Botan/cs218/dtcast/click/elements/dissuade/TCPForger.hh</itemPath>
     </logicalFolder>
     <logicalFolder name="ExternalFiles"
                    displayName="Important Files"
@@ -5402,6 +5402,12 @@
       </item>
       <item path="../../../../../../../Devel/dtcast_click/userlevel/elements.cc">
         <itemTool>1</itemTool>
+      </item>
+      <item path="/Users/cawka/Botan/cs218/dtcast/click/elements/dissuade/BandwidthAnnotator.cc">
+        <itemTool>1</itemTool>
+      </item>
+      <item path="/Users/cawka/Botan/cs218/dtcast/click/elements/dissuade/BandwidthAnnotator.hh">
+        <itemTool>3</itemTool>
       </item>
       <item path="/Users/cawka/Botan/cs218/dtcast/click/elements/dissuade/PacketReorder.cc">
         <itemTool>1</itemTool>

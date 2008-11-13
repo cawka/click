@@ -24,7 +24,7 @@ CLEAN_SUBPROJECTS=${CLEAN_SUBPROJECTS_${SUBPROJECTS}}
 
 
 # Project Name
-PROJECTNAME=dissuade
+PROJECTNAME=netbeans_dissuade
 
 # Active Configuration
 DEFAULTCONF=Default
