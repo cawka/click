@@ -16,3 +16,5 @@ autom4te*
 +*
 depcomp
 installch
+*.o
+etc/pkg-config.mk
