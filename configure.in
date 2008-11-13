@@ -870,8 +870,17 @@ pcap.h and/or -lpcap not found; user-level driver can't steal packets.
     DRIVERS="$DRIVERS userlevel"
     AC_DEFINE(HAVE_USERLEVEL_DRIVER)
     HAVE_USERLEVEL_DRIVER=1
-fi
 
+dnl check if iptables or ipfw present
+    if test -f /sbin/iptables ; then
+	AC_DEFINE(HAVE_IPTABLES)
+	HAVE_IPTABLES=1
+    fi
+    if test -f /sbin/ipfw ; then
+	AC_DEFINE(HAVE_IPFW)
+	HAVE_IPFW=1
+    fi
+fi
 
 dnl other user-level specifics
 

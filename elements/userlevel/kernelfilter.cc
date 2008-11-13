@@ -77,8 +77,14 @@ KernelFilter::device_filter(const String &devname, bool add_filter,
 			    ErrorHandler *errh)
 {
     StringAccum cmda;
+#ifdef HAVE_IPTABLES	
     cmda << "/sbin/iptables " << (add_filter ? "-A" : "-D") << " INPUT -i "
 	 << shell_quote(devname) << " -j DROP";
+#elif HAVE_IPFW
+    cmda << "/sbin/ipfw -q " << (add_filter ? "add" : "del") << " 1 drop in via " << shell_quote(devname);
+#else
+	return 0;
+#endif
     String cmd = cmda.take_string();
     int before = errh->nerrors();
     String out = shell_command_output_string(cmd, "", errh);

@@ -101,6 +101,12 @@
 /* Define if you have the pcap_setnonblock function. */
 #undef HAVE_PCAP_SETNONBLOCK
 
+/* Define if you have iptables installed */
+#undef HAVE_IPTABLES
+
+/* Define if you have ipfw installed */
+#undef HAVE_IPFW
+
 /* Define if you have -lproper and prop.h, and proper operations should be
    preferred to their non-proper counterparts. */
 #undef HAVE_PROPER
