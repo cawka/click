@@ -224,8 +224,8 @@ FromDevice::initialize(ErrorHandler *errh)
 	// nonblocking I/O on the packet socket so we can poll
 	int pcap_fd = fd();
 # if HAVE_PCAP_SETNONBLOCK
-	if (pcap_setnonblock(_pcap, 1, ebuf) < 0)
-	    errh->warning("pcap_setnonblock: %s", ebuf);
+//	if (pcap_setnonblock(_pcap, 1, ebuf) < 0)
+//	    errh->warning("pcap_setnonblock: %s", ebuf);
 # else
 	if (fcntl(pcap_fd, F_SETFL, O_NONBLOCK) < 0)
 	    errh->warning("setting nonblocking: %s", strerror(errno));
