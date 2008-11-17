@@ -66,12 +66,33 @@ false.
 =item END_CALL
 
 Specifies a write handler to call when the first packet after END is seen.
-STOP and END_CALL are mutually exclusive.
+The variable "$t" in the write handler argument is expanded to the packet's
+timestamp.  STOP and END_CALL are mutually exclusive.
 
 =back
 
 Supply at most one of START, START_AFTER, and START_DELAY, and at most one of
 END, END_AFTER, END_DELAY, and INTERVAL.
+
+=h start rw
+
+Returns or sets the START time.  If you used START_AFTER or START_DELAY, then
+this handler returns garbage until a packet has passed.
+
+=h end rw
+
+Returns or sets the END time.  If you used START_AFTER or START_DELAY, then
+this handler returns garbage until a packet has passed.
+
+=h interval rw
+
+Returns or sets the INTERVAL.  Setting INTERVAL leaves the current START as is
+and adjusts END.
+
+=h extend_interval w
+
+Takes a timestamp.  Extends the LAST time by that amount.  If extend_interval
+is called from an END_CALL handler, then the triggering packet is not dropped.
 
 =a
 
@@ -106,10 +127,15 @@ class TimeFilter : public Element { public:
     bool _last_h_ready : 1;
     HandlerCall *_last_h;
 
-    void first_packet(const Timestamp&);
+    void first_packet(const Timestamp &);
     Packet *kill(Packet *);
 
+    enum {
+	h_start, h_end, h_interval, h_extend_interval
+    };
+    static String read_handler(Element *, void *);
     static int write_handler(const String &, Element *, void*, ErrorHandler *);
+
 };
 
 CLICK_ENDDECLS
