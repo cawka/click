@@ -9,10 +9,10 @@
 #include <click/timer.hh>
 CLICK_DECLS
 
-class BandwidthAnnotator : public Element
+class BWMeter : public Element
 {
 public:
-	BandwidthAnnotator( );
+	BWMeter( );
 	
 	virtual int initialize( ErrorHandler* );
 	const char *class_name() const { return "BandwidthAnnotator"; }
@@ -40,7 +40,11 @@ private:
 	Timestamp _tk_1;
 	
 	Timer _timer;
+	
+	uint32_t _length;
+	uint32_t _count;
 };
 
 CLICK_ENDDECLS
-#endif DROPPER_H
+#endif
+

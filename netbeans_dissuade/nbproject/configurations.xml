@@ -1520,8 +1520,8 @@
       </logicalFolder>
     </logicalFolder>
     <logicalFolder name="f1" displayName="dissuade" projectFiles="true">
-      <itemPath>/Users/cawka/Botan/cs218/dtcast/click/elements/dissuade/BandwidthAnnotator.cc</itemPath>
-      <itemPath>/Users/cawka/Botan/cs218/dtcast/click/elements/dissuade/BandwidthAnnotator.hh</itemPath>
+      <itemPath>/Users/cawka/Botan/cs218/dtcast/click/elements/dissuade/BWMeter.cc</itemPath>
+      <itemPath>/Users/cawka/Botan/cs218/dtcast/click/elements/dissuade/BWMeter.hh</itemPath>
       <itemPath>/Users/cawka/Botan/cs218/dtcast/click/elements/dissuade/dropper.cc</itemPath>
       <itemPath>/Users/cawka/Botan/cs218/dtcast/click/elements/dissuade/dropper.hh</itemPath>
       <itemPath>/Users/cawka/Botan/cs218/dtcast/click/elements/dissuade/PacketReorder.cc</itemPath>
@@ -5642,10 +5642,10 @@
       <item path="../userlevel/elements.cc">
         <itemTool>1</itemTool>
       </item>
-      <item path="/Users/cawka/Botan/cs218/dtcast/click/elements/dissuade/BandwidthAnnotator.cc">
+      <item path="/Users/cawka/Botan/cs218/dtcast/click/elements/dissuade/BWMeter.cc">
         <itemTool>1</itemTool>
       </item>
-      <item path="/Users/cawka/Botan/cs218/dtcast/click/elements/dissuade/BandwidthAnnotator.hh">
+      <item path="/Users/cawka/Botan/cs218/dtcast/click/elements/dissuade/BWMeter.hh">
         <itemTool>3</itemTool>
       </item>
       <item path="/Users/cawka/Botan/cs218/dtcast/click/elements/dissuade/PacketReorder.cc">
