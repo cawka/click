@@ -57,12 +57,6 @@ const char Element::COMPLETE_FLOW[] = "x/x";
 
 int Element::nelements_allocated = 0;
 
-#if CLICK_STATS >= 2
-# define ELEMENT_CTOR_STATS _calls(0), _self_cycles(0), _child_cycles(0),
-#else
-# define ELEMENT_CTOR_STATS
-#endif
-
 /** @mainpage Click
  *  @section  Introduction
  *
@@ -129,8 +123,7 @@ class MyNothingElement : public Element { public:
   of the element's class name.
 
   Although this element definition is complete, Click's compilation process
-  requires that a real element come with a bit more boilerplate.  In
-  particular, both a header file and a source file are required.  Here's a
+  requires that a real element come with a bit more boilerplate.  Here's a
   possible definition of our nothing element, including all boilerplate:
 
 @code
@@ -225,7 +218,7 @@ class MyNullElement : public Element { public:
     There is no harm in verifying these invariants with assertions, since
     bogus element code can violate them (by passing a bad value for
     <tt>port</tt> or <tt>p</tt>, for example), but such errors are rare in
-    practice.  The elements that we write mostly assume that the invariants
+    practice.  Our elements mostly assume that the invariants
     hold.</li>
   </ul>
 
@@ -416,20 +409,24 @@ void BetterIPCounter3::push(int port, Packet *p) {
 
 /** @brief Construct an Element. */
 Element::Element()
-    : ELEMENT_CTOR_STATS _router(0), _eindex(-1)
+    : _router(0), _eindex(-1)
 {
     nelements_allocated++;
     _ports[0] = _ports[1] = &_inline_ports[0];
     _nports[0] = _nports[1] = 0;
+
+#if CLICK_STATS >= 2
+    reset_cycles();
+#endif
 }
 
 Element::~Element()
 {
     nelements_allocated--;
-    if (_ports[1] != _inline_ports && _ports[1] != _inline_ports + _nports[0])
-	delete[] _ports[1];
-    if (_ports[0] != _inline_ports)
+    if (_ports[0] < _inline_ports || _ports[0] >= _inline_ports + INLINE_PORTS)
 	delete[] _ports[0];
+    if (_ports[1] < _inline_ports || _ports[1] >= _inline_ports + INLINE_PORTS)
+	delete[] _ports[1];
 }
 
 // CHARACTERISTICS
@@ -508,10 +505,10 @@ Element::cast(const char *name)
  * @param name name of the type being cast to
  *
  * Click calls this function to see whether a port corresponds to an object of
- * a given type, identified by @a name.  The function should return a pointer
- * to the named object, or a null pointer if this element doesn't have that
- * type.  @a name can name an element class or another type of interface, such
- * as @c "Storage" or Notifier::EMPTY_NOTIFIER.
+ * the type called @a name.  The function should return a pointer to the named
+ * object, or a null pointer if this port doesn't have that type.  @a name can
+ * name an element class or another type of interface, such as @c "Storage" or
+ * Notifier::EMPTY_NOTIFIER.
  *
  * The default implementation returns the result of cast(), ignoring the @a
  * isoutput and @a port arguments.
@@ -526,13 +523,6 @@ Element::port_cast(bool isoutput, int port, const char *name)
 {
     (void) isoutput, (void) port;
     return cast(name);
-}
-
-/** @brief Return the element's master. */
-Master *
-Element::master() const
-{
-    return _router->master();
 }
 
 /** @brief Return the element's name.
@@ -599,32 +589,33 @@ Element::set_nports(int new_ninputs, int new_noutputs)
 
     // decide if inputs & outputs were inlined
     bool old_in_inline =
-	(_ports[0] == _inline_ports);
+	(_ports[0] >= _inline_ports && _ports[0] < _inline_ports + INLINE_PORTS);
     bool old_out_inline =
-	(_ports[1] == _inline_ports || _ports[1] == _inline_ports + _nports[0]);
+	(_ports[1] >= _inline_ports && _ports[1] < _inline_ports + INLINE_PORTS);
+    bool prefer_pull = (processing() == PULL);
 
     // decide if inputs & outputs should be inlined
     bool new_in_inline =
 	(new_ninputs == 0
 	 || new_ninputs + new_noutputs <= INLINE_PORTS
 	 || (new_ninputs <= INLINE_PORTS && new_noutputs > INLINE_PORTS)
-	 || (new_ninputs <= INLINE_PORTS && new_ninputs > new_noutputs
-	     && processing() == PULL));
+	 || (new_ninputs <= INLINE_PORTS && prefer_pull));
     bool new_out_inline =
 	(new_noutputs == 0
 	 || new_ninputs + new_noutputs <= INLINE_PORTS
 	 || (new_noutputs <= INLINE_PORTS && !new_in_inline));
 
     // create new port arrays
-    Port *new_inputs =
-	(new_in_inline ? _inline_ports : new Port[new_ninputs]);
-    if (!new_inputs)		// out of memory -- return
+    Port *new_inputs;
+    if (new_in_inline)
+	new_inputs = _inline_ports + (!new_out_inline || prefer_pull ? 0 : new_noutputs);
+    else if (!(new_inputs = new Port[new_ninputs]))
 	return -ENOMEM;
 
-    Port *new_outputs =
-	(new_out_inline ? _inline_ports + (new_in_inline ? new_ninputs : 0)
-	 : new Port[new_noutputs]);
-    if (!new_outputs) {		// out of memory -- return
+    Port *new_outputs;
+    if (new_out_inline)
+	new_outputs = _inline_ports + (!new_in_inline || !prefer_pull ? 0 : new_ninputs);
+    else if (!(new_outputs = new Port[new_noutputs])) {
 	if (!new_in_inline)
 	    delete[] new_inputs;
 	return -ENOMEM;
@@ -664,7 +655,7 @@ Element::set_nports(int new_ninputs, int new_noutputs)
  * output port than there are input ports.</dd>
  * </dl>
  *
- * These ranges help Click determine whether a configuration uses too few or
+ * Port counts are used to determine whether a configuration uses too few or
  * too many ports, and lead to errors such as "'e' has no input 3" and "'e'
  * input 3 unused".
  *
@@ -775,13 +766,13 @@ Element::initialize_ports(const int *in_v, const int *out_v)
     for (int i = 0; i < ninputs(); i++) {
 	// allowed iff in_v[i] == VPULL
 	int port = (in_v[i] == VPULL ? 0 : -1);
-	_ports[0][i] = Port(this, 0, port);
+	_ports[0][i].assign(this, 0, port, false);
     }
 
     for (int o = 0; o < noutputs(); o++) {
 	// allowed iff out_v[o] != VPULL
 	int port = (out_v[o] == VPULL ? -1 : 0);
-	_ports[1][o] = Port(this, 0, port);
+	_ports[1][o].assign(this, 0, port, true);
     }
 }
 
@@ -789,7 +780,7 @@ int
 Element::connect_port(bool isoutput, int port, Element* e, int e_port)
 {
     if (port_active(isoutput, port)) {
-	_ports[isoutput][port] = Port(this, e, e_port);
+	_ports[isoutput][port].assign(this, e, e_port, isoutput);
 	return 0;
     } else
 	return -1;
@@ -803,10 +794,10 @@ Element::connect_port(bool isoutput, int port, Element* e, int e_port)
  *
  * An element class overrides this virtual function to return a C string
  * describing how packets flow within the element.  That is, can packets that
- * arrive on input port X be emitted on output port Y, for all X and Y?  This
- * information helps Click answer questions such as "What Queues are
- * downstream of this element?" and "Should this agnostic port be push or
- * pull?".  See below for more.
+ * arrive on input port X be emitted on output port Y?  This information helps
+ * Click answer questions such as "What Queues are downstream of this
+ * element?" and "Should this agnostic port be push or pull?".  See below for
+ * more.
  *
  * A flow code string consists of an input specification and an output
  * specification, separated by a slash.  Each specification is a sequence of
@@ -885,9 +876,8 @@ Element::connect_port(bool isoutput, int port, Element* e, int e_port)
  *
  * <h3>Determining an element's flow code</h3>
  *
- * What does it mean for a packet to travel from one port to another?  To pick
- * the right flow code for an element, consider how a flow code would affect a
- * simple router.
+ * To pick the right flow code for an element, consider how a flow code would
+ * affect a simple router.
  *
  * Given an element @e E with input port @e M and output port @e N, imagine
  * this simple configuration (or a similar configuration):
@@ -967,13 +957,13 @@ next_flow_code(const char*& p, int port, Bitvector& code, ErrorHandler* errh, co
 	    else if (*p == '#')
 		code[port + 128] = true;
 	    else if (errh)
-		errh->error("'%{element}' flow code: invalid character '%c'", e, *p);
+		errh->error("%<%{element}%> flow code: invalid character %<%c%>", e, *p);
 	}
 	if (negated)
 	    code.negate();
 	if (!*p) {
 	    if (errh)
-		errh->error("'%{element}' flow code: missing ']'", e);
+		errh->error("%<%{element}%> flow code: missing %<]%>", e);
 	    p--;			// don't skip over final '\0'
 	}
     } else if ((*p >= 'A' && *p <= 'Z') || (*p >= 'a' && *p <= 'z'))
@@ -982,7 +972,7 @@ next_flow_code(const char*& p, int port, Bitvector& code, ErrorHandler* errh, co
 	code[port + 128] = true;
     else {
 	if (errh)
-	    errh->error("'%{element}' flow code: invalid character '%c'", e, *p);
+	    errh->error("%<%{element}%> flow code: invalid character %<%c%>", e, *p);
 	p++;
 	return -1;
     }
@@ -1012,6 +1002,9 @@ next_flow_code(const char*& p, int port, Bitvector& code, ErrorHandler* errh, co
  *  - port_flow(false, 1, travels) returns [false, false, true, false]
  *  - port_flow(true, 0, travels) returns [true, false]
  *
+ * Uses an element's overridden flow code when one is supplied;
+ * see Router::flow_code_override().
+ *
  * @sa flow_code
  */
 void
@@ -1038,7 +1031,7 @@ Element::port_flow(bool isoutput, int p, Bitvector* travels) const
     const char* f_out = strchr(f, '/');
     f_out = (f_out ? f_out + 1 : f_in);
     if (*f_out == '\0' || *f_out == '/') {
-	errh->error("'%{element}' flow code: missing or bad '/'", this);
+	errh->error("%<%{element}%> flow code: missing or bad %</%>", this);
 	return;
     }
 
@@ -1992,12 +1985,25 @@ read_ocounts_handler(Element *f, void *)
  * cycles spent in this element and elements it pulls or pushes.
  * cycles spent in the elements this one pulls and pushes.
  */
-static String
-read_cycles_handler(Element *f, void *)
+String
+Element::read_cycles_handler(Element *e, void *)
 {
-  return(String(f->_calls) + "\n" +
-         String(f->_self_cycles) + "\n" +
-         String(f->_child_cycles));
+    StringAccum sa;
+    if (e->_calls)
+	sa << e->_calls << ' ' << e->_self_cycles << ' '
+	   << e->_child_cycles << '\n';
+    if (e->_task_calls)
+	sa << "tasks " << e->_task_calls << ' ' << e->_task_cycles << "\n";
+    if (e->_timer_calls)
+	sa << "timers " << e->_timer_calls << ' ' << e->_timer_cycles << "\n";
+    return sa.take_string();
+}
+
+int
+Element::write_cycles_handler(const String &, Element *e, void *, ErrorHandler *)
+{
+    e->reset_cycles();
+    return 0;
 }
 #endif
 
@@ -2016,6 +2022,7 @@ Element::add_default_handlers(bool allow_write_config)
   add_read_handler("ocounts", read_ocounts_handler, 0);
 # if CLICK_STATS >= 2
   add_read_handler("cycles", read_cycles_handler, 0);
+  add_write_handler("cycles", write_cycles_handler, 0);
 # endif
 #endif
 }
@@ -2034,7 +2041,7 @@ write_task_tickets(const String &s, Element *e, void *thunk, ErrorHandler *errh)
   Task *task = (Task *)((uint8_t *)e + (intptr_t)thunk);
   int tix;
   if (!cp_integer(s, &tix))
-    return errh->error("'tickets' takes an integer between 1 and %d", Task::MAX_TICKETS);
+    return errh->error("%<tickets%> takes an integer between 1 and %d", Task::MAX_TICKETS);
   if (tix < 1) {
     errh->warning("tickets pinned at 1");
     tix = 1;
@@ -2483,8 +2490,8 @@ Element::read_positional_handler(Element *element, void *user_data)
 /** @brief Standard read handler returning a keyword argument.
  *
  * Use this function to define a handler that returns one of an element's
- * keyword configuration arguments.  The @a thunk argument is a C string that
- * specifies which one.  For instance, to add a "data" read handler that
+ * keyword configuration arguments.  The @a user_data argument is a C string
+ * that specifies which one.  For instance, to add a "data" read handler that
  * returns the element's "DATA" keyword argument:
  *
  * @code
@@ -2501,7 +2508,7 @@ Element::read_positional_handler(Element *element, void *user_data)
  * missing:
  *
  * @code
- * add_write_handler("data", reconfigure_keyword_handler, "0 DATA");
+ * add_write_handler("data", reconfigure_keyword_handler, (void *) "0 DATA");
  * @endcode
  *
  * @sa configuration: used to obtain the element's current configuration.
@@ -2518,26 +2525,26 @@ Element::read_keyword_handler(Element *element, void *user_data)
 /** @brief Standard write handler for reconfiguring an element by changing one
  * of its positional arguments.
  *
+ * @warning
+ * Prefer reconfigure_keyword_handler() to reconfigure_positional_handler().
+ *
  * Use this function to define a handler that, when written, reconfigures an
- * element by changing one of its positional arguments.  The @a thunk argument
- * is a typecast integer that specifies which one.  For typecast integer that
- * specifies which one.  For instance, to add "first", "second", and "third"
- * write handlers that change the element's first three configuration
- * arguments:
+ * element by changing one of its positional arguments.  The @a user_data
+ * argument is a typecast integer that specifies which one.  For typecast
+ * integer that specifies which one.  For instance, to add "first", "second",
+ * and "third" write handlers that change the element's first three
+ * configuration arguments:
  *
  * @code
- * add_write_handler("first", reconfigure_positional_handler, (void *) 0);
- * add_write_handler("second", reconfigure_positional_handler, (void *) 1);
- * add_write_handler("third", reconfigure_positional_handler, (void *) 2);
+ * add_write_handler("first", reconfigure_positional_handler, 0);
+ * add_write_handler("second", reconfigure_positional_handler, 1);
+ * add_write_handler("third", reconfigure_positional_handler, 2);
  * @endcode
  *
  * When one of these handlers is written, Click will call the element's
  * configuration() method to obtain the element's current configuration,
  * change the relevant argument, and call live_reconfigure() to reconfigure
  * the element.
- *
- * @warning
- * Prefer reconfigure_keyword_handler() to reconfigure_positional_handler().
  *
  * @sa configuration: used to obtain the element's current configuration.
  * @sa live_reconfigure: used to reconfigure the element.
@@ -2601,17 +2608,17 @@ Element::reconfigure_keyword_handler(const String &arg, Element *e,
  * user-level programs and a Click kernel module, although they're also
  * available in user-level Click.  Rather than open a file, write ASCII data
  * to the file, and close it, as for handlers, the user-level program calls @c
- * ioctl() on an open file; Click intercepts the @c ioctl and calls the
+ * ioctl() on an open file.  Click intercepts the @c ioctl and calls the
  * llrpc() method, passing it the @c ioctl number and the associated @a data
  * pointer.  The llrpc() method should read and write @a data as appropriate.
  * @a data may be either a kernel pointer (i.e., directly accessible) or a
  * user pointer (i.e., requires special macros to access), depending on the
  * LLRPC number; see <click/llrpc.h> for more.
  *
- * The return value is returned to the user in @c errno.  Overriding
- * implementations should handle @a commands they understand as appropriate,
- * and call their parents' llrpc() method to handle any other commands.  The
- * default implementation simply returns @c -EINVAL.
+ * A negative return value is interpreted as an error and returned to the user
+ * in @c errno.  Overriding implementations should handle @a commands they
+ * understand as appropriate, and call their parents' llrpc() method to handle
+ * any other commands.  The default implementation simply returns @c -EINVAL.
  *
  * Click elements should never call each other's llrpc() methods directly; use
  * local_llrpc() instead.

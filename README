@@ -1,4 +1,4 @@
-THE CLICK MODULAR ROUTER RELEASE 1.6.0
+THE CLICK MODULAR ROUTER RELEASE 1.7.0
 ======================================
 
     This is the README file for the source release for the Click modular
@@ -18,6 +18,8 @@ CONTENTS
 
 CLICKDIR			this directory
 CLICKDIR/apps			Click-related applications
+CLICKDIR/apps/clicky		... GTK program for displaying configurations
+				    and interacting with drivers
 CLICKDIR/apps/ClickController	... Java program for interacting with drivers
 CLICKDIR/bsdmodule		FreeBSD 4.5 kernel module driver [NOT WORKING]
 CLICKDIR/conf			configuration files

@@ -186,7 +186,7 @@ check_tmpdir(const Vector<ArchiveElement> &archive, bool populate_tmpdir,
 		if (!f)
 		    errh->warning("%s: %s", filename.c_str(), strerror(errno));
 		else {
-		    fwrite(ae.data.data(), 1, ae.data.length(), f);
+		    ignore_result(fwrite(ae.data.data(), 1, ae.data.length(), f));
 		    fclose(f);
 		}
 	    }
@@ -224,7 +224,7 @@ click_compile_archive_file(const Vector<ArchiveElement> &archive,
 	package_file += ".bo";
 
     ContextErrorHandler cerrh
-	(errh, "While compiling package %<" + package_file + "%>:");
+	(errh, "While compiling package %<%s%>:", package_file.c_str());
 
     // write .cc file
     String filename = ae->name;
@@ -237,7 +237,7 @@ click_compile_archive_file(const Vector<ArchiveElement> &archive,
 	cerrh.error("%s: %s", filepath.c_str(), strerror(errno));
 	return String();
     }
-    fwrite(ae->data.data(), 1, ae->data.length(), f);
+    ignore_result(fwrite(ae->data.data(), 1, ae->data.length(), f));
     fclose(f);
 
     // prepare click-buildtool makepackage
@@ -298,7 +298,7 @@ clickdl_load_requirement(String name, const Vector<ArchiveElement> *archive, Err
     if (!p || p->loaded)
 	return;
 
-    ContextErrorHandler cerrh(errh, "While loading package %<" + name + "%>:");
+    ContextErrorHandler cerrh(errh, "While loading package %<%s%>:", name.c_str());
     bool tmpdir_populated = false;
 
 #ifdef CLICK_TOOL
@@ -309,7 +309,7 @@ clickdl_load_requirement(String name, const Vector<ArchiveElement> *archive, Err
     String package;
 
     // check archive
-    const ArchiveElement *ae;
+    const ArchiveElement *ae = 0;
     if (archive && (ae = ArchiveElement::find(*archive, name + suffix))) {
 	if (!check_tmpdir(*archive, false, tmpdir_populated, &cerrh))
 	    return;
@@ -319,7 +319,7 @@ clickdl_load_requirement(String name, const Vector<ArchiveElement> *archive, Err
 	    cerrh.error("cannot open %<%s%>: %s", package.c_str(), strerror(errno));
 	    package = String();
 	} else {
-	    fwrite(ae->data.data(), 1, ae->data.length(), f);
+	    ignore_result(fwrite(ae->data.data(), 1, ae->data.length(), f));
 	    fclose(f);
 	}
     } else if (archive && (ae = ArchiveElement::find(*archive, name + cxx_suffix)))

@@ -15,6 +15,10 @@ Script(INSTRUCTIONS...)
 
 script a Click router configuration
 
+=io
+
+normally none
+
 =d
 
 The Script element implements a simple scripting language useful for
@@ -136,19 +140,21 @@ of the script, like 'C<exit>' and 'C<end>' respectively.  'C<goto begin
 
 Transfers control to the first instruction.
 
+=item 'C<end>'
+
+End execution of this script.  In signal scripts, 'C<end>' causes the script
+to be reinstalled as a signal handler.  In packet scripts, 'C<end>' emits
+the packet on output 0.
+
 =item 'C<exit>'
 
 End execution of this script.
 
-=item 'C<end>'
-
-End execution of this script.  In signal scripts, 'C<end>' causes the script
-to be reinstalled as a signal handler.
-
 =item 'C<return> [VALUE]', 'C<returnq> [VALUE]'
 
-End execution of this script.  For passive scripts, VALUE is returned as the
-value of the C<run> handler.
+End execution of this script.  In passive scripts, VALUE is returned as the
+value of the C<run> handler.  In packet scripts, VALUE is the port on which
+the packet should be emitted.
 
 =item 'C<error> [MSG]', 'C<errorq> [MSG]'
 
@@ -170,12 +176,12 @@ are:
 
 =item C<ACTIVE>
 
-An active script starts running as soon as the router is initialized.  This is
+The script starts running as soon as the router is initialized.  This is
 the default.
 
 =item C<PASSIVE>
 
-A passive script runs in response to a handler, namely the C<run> handler.
+The script runs in response to a handler, namely the C<run> handler.
 Passive scripts can help build complex handlers from existing simple ones; for
 example, here's a passive script whose C<s.run> read handler returns the sum
 of two Counter handlers.
@@ -189,9 +195,15 @@ arguments.  C<$1>, C<$2>, etc. equal the first, second, etc. space-separated
 portions of C<$args>, and C<$#> equals the number of space-separated
 arguments.
 
+=item C<PACKET>
+
+The script runs in response to a packet push event.  Within the script, the
+C<$input> variable equals the packet input port.  The script's return value
+is used as the output port number.
+
 =item C<PROXY>
 
-A proxy script runs in response to I<any> handler (except Script's predefined
+The script runs in response to I<any> handler (except Script's predefined
 handlers).  Within the script, the C<$0> variable equals the handler's name.
 Also, the C<$write> variable is "true" if the handler was called as a write
 handler.  For example, consider:
@@ -211,12 +223,12 @@ error.
 
 =item C<DRIVER>
 
-A driver script manages the Click driver's stop events.  See DriverManager for
+The script manages the Click driver's stop events.  See DriverManager for
 more information.
 
 =item C<SIGNAL> SIGNO...
 
-User-level only: A signal script runs in response to the signal(s) specified
+User-level only: The script runs in response to the signal(s) specified
 by the SIGNO argument(s).  Each SIGNO can be an integer or a signal name, such
 as INT or HUP.  Soon after the driver receives a named signal, this script
 will run.  The signal handler is automatically blocked until the script runs.
@@ -287,12 +299,19 @@ integer and returns that, whereas the 'C<div>' handler returns a
 floating-point number; in the kernel, 'C<idiv>' and 'C<div>' both perform
 integer division.
 
+=h mod, rem "read with parameters"
+
+Returns the remainder of two space-separated numbers; for example, 'C<mod 7 3>'
+returns "C<1>".  'C<mod>' expects integer operands and returns the integer
+modulus.  At user level, 'C<rem>' implements floating-point remainder; in the
+kernel, it is the same as 'C<mod>'.
+
 =h eq, ne, lt, gt, le, ge "read with parameters"
 
 Compares two parameters and returns the result.  For example, 'C<eq 10 0xA>'
 returns "C<true>", and 'C<le 9 8>' returns "C<false>".  If either parameter
 cannot be interpreted as a number, performs a string comparison in bytewise
-lexicographic order.  For example, 'C<eq 10x 10x>' return "C<true>".
+lexicographic order.  For example, 'C<eq 10x 10x>' returns "C<true>".
 
 =h not "read with parameters"
 
@@ -303,6 +322,18 @@ returns its negation.
 
 Useful for true/false operations.  Parses all parameters as Booleans and
 returns their conjunction or disjunction, respectively.
+
+=h if "read with parameters"
+
+Expects three space-separated parameters, the first a Boolean.  Returns the
+second parameter if the Boolean is true, or the third parameter if the Boolean
+is false.
+
+=h in "read with parameters"
+
+Returns true if the first space-separated argument equals any of the other
+arguments, using string comparison.  For example, 'C<in foo bar foo>'
+returns "C<true>".
 
 =h sprintf "read with parameters"
 
@@ -315,6 +346,11 @@ accordingly.  For example, 'C<sprintf "%05x" 127>' returns "C<0007F>".
 Given zero arguments, returns a random integer between 0 and RAND_MAX.  Given
 one argument N, returns a random integer between 0 and N-1.  Given two
 arguments N1 and N2, returns a random integer between N1 and N2.
+
+=h readable, writable "read with parameters"
+
+Parses its parameters as a space-separated list of handler names.  Returns
+true if all the named handlers exist and are readable (or writable).
 
 =h now r
 
@@ -339,10 +375,13 @@ class Script : public Element { public:
     static void static_cleanup();
 
     const char *class_name() const	{ return "Script"; }
+    const char *port_count() const	{ return "-/-"; }
+    const char *processing() const	{ return PUSH; }
     int configure(Vector<String> &, ErrorHandler *);
     int initialize(ErrorHandler *);
     void add_handlers();
 
+    void push(int port, Packet *p);
     void run_timer(Timer *);
 
     enum Insn {
@@ -357,7 +396,8 @@ class Script : public Element { public:
   private:
 
     enum Type {
-	TYPE_ACTIVE, TYPE_DRIVER, TYPE_SIGNAL, TYPE_PASSIVE, type_proxy
+	type_active, type_driver, type_signal, type_passive, type_proxy,
+	type_push
     };
 
     enum {
@@ -392,11 +432,19 @@ class Script : public Element { public:
 	bool expand(const String &, int vartype, int quote, StringAccum &) const;
     };
 
+    enum {
+	ST_STEP = 0, ST_RUN, ST_GOTO,
+	AR_ADD = 0, AR_SUB, AR_MUL, AR_DIV, AR_IDIV, ar_mod, ar_rem,
+	AR_LT, AR_EQ, AR_GT, AR_GE, AR_NE, AR_LE, // order is important
+	AR_FIRST, AR_NOT, AR_SPRINTF, ar_random, ar_cat,
+	ar_and, ar_or, ar_now, ar_if, ar_in, ar_readable, ar_writable
+    };
+
     void add_insn(int, int, int = 0, const String & = String());
     int step(int nsteps, int step_type, int njumps, ErrorHandler *errh);
     int complete_step(String *retval);
     int find_label(const String &) const;
-    int find_variable(const String &) const;
+    int find_variable(const String &name, bool add);
 
     static int step_handler(int, String&, Element*, const Handler*, ErrorHandler*);
     static int arithmetic_handler(int, String&, Element*, const Handler*, ErrorHandler*);

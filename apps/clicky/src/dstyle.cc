@@ -2,8 +2,8 @@
 # include <config.h>
 #endif
 #include <click/config.h>
-#include "dwidget.hh"
 #include "dstyle.hh"
+#include "dwidget.hh"
 #include "wdiagram.hh"
 #include "hvalues.hh"
 #include <click/userutils.hh>
@@ -140,8 +140,7 @@ port.agnostic.error, port.push.agnostic.error, port.pull.agnostic.error {\n\
 }\n\
 }\n\
 *Queue {\n\
-    min-width: 17.6px;\n\
-    min-height: 49.6px;\n\
+    min-length: 49.6px;\n\
     style: queue;\n\
 }\n\
 fullness {\n\
@@ -194,7 +193,6 @@ static dcss_propmatch elt_pm[] = {
     { "shadow-style", 0 },
     { "shadow-width", 0 },
     { "shadow-color", 0 },
-    { "orientation", 0 },
     { "style", 0 },
     { "text", 0 },
     { "display", 0 },
@@ -202,7 +200,9 @@ static dcss_propmatch elt_pm[] = {
     { "decorations", 0 },
     { "queue-stripe-style", 0 },
     { "queue-stripe-width", 0 },
-    { "queue-stripe-color", 0 }
+    { "queue-stripe-color", 0 },
+    { "port-split", 0 },
+    { "flow-split", 0 }
 };
 
 static dcss_propmatch elt_size_pm[] = {
@@ -219,7 +219,9 @@ static dcss_propmatch elt_size_pm[] = {
     { "margin-bottom", 0 },
     { "margin-left", 0 },
     { "queue-stripe-spacing", 0 },
-    { "scale", 0 }
+    { "scale", 0 },
+    { "orientation", 0 },
+    { "min-length", 0 }
 };
 
 static dcss_propmatch handler_pm[] = {
@@ -490,13 +492,49 @@ static String ccss_pop_commavec(String &str)
  *
  */
 
-inline bool int_match_string(const char *begin, const char *end, int i)
+inline bool comparison_char(char c)
 {
-    if (i >= 0 && i <= 9)
-	return begin + 1 == end && begin[0] == i + '0';
-    else {
-	int j;
-	return cp_integer(begin, end, 10, &j) && j == i;
+    return c == '=' || c == '!' || c == '>' || c == '<';
+}
+
+inline bool int_match_string(const char *begin, const char *end, int x,
+			     bool require_comparator = true)
+{
+    int comparator = *begin++;
+    if (begin < end && *begin == '=') {
+	if (comparator == '>')
+	    comparator = 'G';
+	else if (comparator == '<')
+	    comparator = 'L';
+	++begin;
+    } else if (comparator == '!')
+	return false;
+    else if (!require_comparator && isdigit((unsigned char) comparator)) {
+	comparator = '=';
+	--begin;
+    }
+
+    int i;
+    if (begin + 1 == end)
+	i = *begin - '0';
+    else if (!cp_integer(begin, end, 10, &i))
+	return false;
+
+    switch (comparator) {
+    case '=':
+	return x == i;
+    case '!':
+	return x != i;
+    case '>':
+	return x > i;
+    case '<':
+	return x < i;
+    case 'G':
+	return x >= i;
+    case 'L':
+	return x <= i;
+    default:
+	return false;
     }
 }
 
@@ -518,13 +556,15 @@ bool dcss_selector::match(crouter *cr, const delt *e, int *sensitivity) const
 
     const char *s;
     for (const String *k = _klasses.begin(); k != _klasses.end(); ++k)
-	if (k->starts_with("in=", 3)) {
+	if (k->starts_with("in", 2) && k->length() > 2
+	    && comparison_char((*k)[2])) {
 	    if (e->fake()
-		|| !int_match_string(k->begin() + 3, k->end(), e->ninputs()))
+		|| !int_match_string(k->begin() + 2, k->end(), e->ninputs()))
 		return false;
-	} else if (k->starts_with("out=", 4)) {
+	} else if (k->starts_with("out", 3) && k->length() > 3
+		   && comparison_char((*k)[3])) {
 	    if (e->fake()
-		|| !int_match_string(k->begin() + 4, k->end(), e->noutputs()))
+		|| !int_match_string(k->begin() + 3, k->end(), e->noutputs()))
 		return false;
 	} else if (k->equals("primitive", 9)) {
 	    if (e->fake() || !e->primitive())
@@ -590,14 +630,18 @@ bool dcss_selector::match(crouter *cr, const delt *e, int *sensitivity) const
 	} else if ((s = find(*k, '=')) != k->end()) {
 	    if (!cr->driver() || !e->flat_name() || !e->primitive())
 		return false;
-	    handler_value *hv = cr->hvalues().find_placeholder(e->flat_name() + "." + k->substring(k->begin(), s), hflag_notify_delt);
+	    const char *hend = s;
+	    if (hend > k->begin() && hend[-1] == '!')
+		--hend;
+	    handler_value *hv = cr->hvalues().find_placeholder(e->flat_name() + "." + k->substring(k->begin(), hend), hflag_notify_delt);
 	    if (!hv)
 		return false;
 	    // XXX fix this
 	    if (!hv->have_hvalue()) {
 		hv->refresh(cr);
 		answer = false;
-	    } else if (hv->hvalue() != k->substring(s + 1, k->end()))
+	    } else if ((hv->hvalue() == k->substring(s + 1, k->end()))
+		       == (*hend == '!'))
 		answer = false;
 	    senses |= dsense_handler;
 	} else
@@ -644,7 +688,7 @@ bool dcss_selector::match_port(bool isoutput, int port, int processing) const
 	    return false;
 
     if (_name && port >= 0
-	&& !int_match_string(_name.begin(), _name.end(), port))
+	&& !int_match_string(_name.begin(), _name.end(), port, false))
 	return false;
 
     return true;
@@ -652,7 +696,7 @@ bool dcss_selector::match_port(bool isoutput, int port, int processing) const
 
 bool dcss_selector::match(const handler_value *hv) const
 {
-    if (!_type.equals("~handler~", 9))
+    if (!_type.equals("handler", 7))
 	return false;
     if (_name && _name != hv->handler_name())
 	if (!_name_glob || !glob_match(hv->handler_name(), _name))
@@ -672,6 +716,9 @@ bool dcss_selector::match(const handler_value *hv) const
 		return false;
 	} else if (k->equals("expensive", 9)) {
 	    if (!(hv->flags() & hflag_expensive))
+		return false;
+	} else if (k->equals("deprecated", 10)) {
+	    if (!(hv->flags() & hflag_deprecated))
 		return false;
 	}
     return true;
@@ -752,7 +799,7 @@ const char *dcss_selector::parse(const String &str, const char *s)
 	    ++s;
 	}
 	if (s == n && start == '#' && *s == '#' && !_name && !_type) {
-	    _type = String::make_stable("~handler~", 9);
+	    _type = String::make_stable("handler", 7);
 	    s = ++n;
 	    goto retry;
 	} else if (s == n && start) {
@@ -1111,6 +1158,8 @@ const char *dcss::parse(const String &str, const String &media, const char *s)
 	    parse_box(str, v, v_ew0, "port-margin");
 	else if (n + 7 == n_end && memcmp(n, "padding", 7) == 0)
 	    parse_box(str, v, v_ew0, "padding");
+	else if (n + 5 == n_end && memcmp(n, "split", 5) == 0)
+	    parse_split(str, v, v_ew0);
 	else
 	    add(str.substring(n, n_end), str.substring(v, v_ew0));
 
@@ -1206,6 +1255,33 @@ void dcss::parse_background(const String &str, const char *s, const char *send)
 
 	if (cp_color(str.substring(n, s), &d, &d, &d, &d))
 	    add("background-color", str.substring(n, s));
+    }
+}
+
+void dcss::parse_split(const String &str, const char *s, const char *send)
+{
+    while (s != send) {
+	s = cp_skip_comment_space(s, send);
+	const char *n = s;
+	while (s != send && !isspace((unsigned char) *s)
+	       && (*s != '/' || s + 1 == send || (s[1] != '/' && s[1] != '*')))
+	    if (*s == '(') {
+		for (++s; s != send && *s != ')'; ++s)
+		    /* */;
+		if (s != send)
+		    ++s;
+	    } else
+		++s;
+
+	if (s == n + 4 && memcmp(n, "none", 4) == 0) {
+	    add("port-split", str.substring(n, s));
+	    add("flow-split", str.substring(n, s));
+	} else if (s > n + 4 && memcmp(n, "flow(", 5) == 0)
+	    add("flow-split", str.substring(n, s));
+	else if ((s == n + 4 && memcmp(n, "both", 4) == 0)
+		 || (s == n + 6 && memcmp(n, "inputs", 6) == 0)
+		 || (s == n + 7 && memcmp(n, "outputs", 7) == 0))
+	    add("port-split", str.substring(n, s));
     }
 }
 
@@ -1715,35 +1791,34 @@ ref_ptr<delt_style> dcss_set::elt_style(crouter *cr, const delt *e, int *sensiti
 	elt_pm[6].vcolor(sty->shadow_color, "shadow-color");
 	if (sty->shadow_color[3] == 0 || sty->shadow_width <= 0)
 	    sty->shadow_style = dshadow_none;
-	String s = elt_pm[7].vstring("orientation");
-	sty->orientation = 0;
-	if (s.find_left("horizontal") >= 0)
-	    sty->orientation = (sty->orientation + 3) & 3;
-	if (s.find_left("reverse") >= 0)
-	    sty->orientation ^= 2;
-	s = elt_pm[8].vstring("style");
+	String s = elt_pm[7].vstring("style");
 	sty->style = (s.equals("queue", 5) ? destyle_queue : destyle_normal);
-	sty->text = cp_unquote(elt_pm[9].vstring("text"));
-	s = elt_pm[10].vstring("display");
+	sty->text = cp_unquote(elt_pm[8].vstring("text"));
+	s = elt_pm[9].vstring("display");
 	sty->display = dedisp_open;
 	if (s.equals("none", 4))
 	    sty->display = dedisp_none;
 	else if (s.equals("closed", 6))
 	    sty->display = dedisp_closed;
-	else if (s.equals("vertical-split", 14))
-	    sty->display = dedisp_vsplit;
-	else if (s.starts_with("flow-split(", 11) && s.back() == ')') {
-	    if ((sty->flow_split = parse_flow_split(s.begin() + 11, s.end() - 1)))
-		sty->display = dedisp_fsplit;
-	} else if (s.equals("passthrough", 11))
+	else if (s.equals("passthrough", 11))
 	    sty->display = dedisp_passthrough;
 	else if (s.equals("expanded", 8))
 	    sty->display = dedisp_expanded;
-	sty->font = elt_pm[11].vstring("font");
-	sty->decorations = elt_pm[12].vstring("decorations");
-	sty->queue_stripe_style = elt_pm[13].vborder_style("queue-stripe-style");
-	sty->queue_stripe_width = elt_pm[14].vpixel("queue-stripe-width", cr, e);
-	elt_pm[15].vcolor(sty->queue_stripe_color, "queue-stripe-color");
+	sty->font = elt_pm[10].vstring("font");
+	sty->decorations = elt_pm[11].vstring("decorations");
+	sty->queue_stripe_style = elt_pm[12].vborder_style("queue-stripe-style");
+	sty->queue_stripe_width = elt_pm[13].vpixel("queue-stripe-width", cr, e);
+	elt_pm[14].vcolor(sty->queue_stripe_color, "queue-stripe-color");
+	s = elt_pm[15].vstring("port-split");
+	sty->port_split = dpdisp_none;
+	if (s.equals("inputs", 6))
+	    sty->port_split = dpdisp_inputs;
+	else if (s.equals("outputs", 7))
+	    sty->port_split = dpdisp_outputs;
+	else if (s.equals("both", 4))
+	    sty->port_split = dpdisp_both;
+	s = elt_pm[16].vstring("flow-split");
+	sty->flow_split = parse_flow_split(s.begin(), s.end());
 
 	style_cache = ref_ptr<delt_style>(sty);
     }
@@ -1783,12 +1858,19 @@ ref_ptr<delt_size_style> dcss_set::elt_size_style(crouter *cr, const delt *e, in
 	sty->padding[3] = elt_size_pm[4].vpixel("padding-left", cr, e) * scale;
 	sty->min_width = elt_size_pm[5].vpixel("min-width", cr, e) * scale;
 	sty->min_height = elt_size_pm[6].vpixel("min-height", cr, e) * scale;
+	sty->min_length = elt_size_pm[15].vpixel("min-length", cr, e) * scale;
 	sty->height_step = elt_size_pm[7].vpixel("height-step", cr, e) * scale;
 	sty->margin[0] = elt_size_pm[8].vpixel("margin-top", cr, e) * scale;
 	sty->margin[1] = elt_size_pm[9].vpixel("margin-right", cr, e) * scale;
 	sty->margin[2] = elt_size_pm[10].vpixel("margin-bottom", cr, e) * scale;
 	sty->margin[3] = elt_size_pm[11].vpixel("margin-left", cr, e) * scale;
 	sty->queue_stripe_spacing = elt_size_pm[12].vpixel("queue-stripe-spacing", cr, e) * scale;
+	String s = elt_size_pm[14].vstring("orientation");
+	sty->orientation = 0;
+	if (s.find_left("horizontal") >= 0)
+	    sty->orientation = 3;
+	if (s.find_left("reverse") >= 0)
+	    sty->orientation ^= 2;
 
 	style_cache = ref_ptr<delt_size_style>(sty);
     }
@@ -1805,12 +1887,12 @@ static int parse_autorefresh(String str, const char *medium, int *period)
 {
     int on = -1;
     double d;
-    while (String x = cp_pop_spacevec(str))
+    while (String x = cp_shift_spacevec(str))
 	if (x.equals("on", 2) || (medium && x.equals("both", 4)))
 	    on = (medium ? 2 : 1);
 	else if (x.equals("off", 3))
 	    on = 0;
-	else if (x.equals(medium, -1))
+	else if (medium && x.equals(medium, -1))
 	    on = 1;
 	else if (cp_seconds(x, &d) && d >= 0) {
 	    if (on < 0)
@@ -1828,7 +1910,7 @@ void dcss_set::collect_handler_styles(crouter *cr, const handler_value *hv,
 				      bool &generic) const
 {
     for (dcss * const *sp = _s.begin() + 2; sp != _s.end(); ++sp)
-	if ((*sp)->type()[0] == '~')
+	if ((*sp)->type()[0] == 'h')
 	    for (dcss *s = *sp; s; s = s->_next)
 		if (s->selector().match(hv) && s->match_context(cr, e)) {
 		    if (!s->selector().generic_handler() || s->has_context())
@@ -1982,7 +2064,7 @@ ref_ptr<dactivity_style> dcss_set::activity_style(PermString decor, crouter *cr,
 	    sty->type = dactivity_rate;
 	    s = s.substring(4);
 	    sty->rate_period = 1;
-	    (void) cp_seconds(cp_pop_spacevec(s), &sty->rate_period);
+	    (void) cp_seconds(cp_shift_spacevec(s), &sty->rate_period);
 	    sty->rate_period = std::max(sty->rate_period, 0.01);
 	} else
 	    sty->type = dactivity_absolute;
@@ -2007,7 +2089,7 @@ ref_ptr<dactivity_style> dcss_set::activity_style(PermString decor, crouter *cr,
 	    sty->colors.resize(sty->colors.size() + 5);
 	    sty->colors[x] = -1;
 	    if (*vsp && isdigit((unsigned char) (*vsp)[0])) {
-		if (!cp_relative(cp_pop_spacevec(*vsp), &sty->colors[x])
+		if (!cp_relative(cp_shift_spacevec(*vsp), &sty->colors[x])
 		    || sty->colors[x] < 0 || sty->colors[x] > 1)
 		    sty->colors[x] = -1;
 	    }

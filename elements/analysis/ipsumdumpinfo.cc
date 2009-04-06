@@ -5,6 +5,7 @@
  *
  * Copyright (c) 2002 International Computer Science Institute
  * Copyright (c) 2004 Regents of the University of California
+ * Copyright (c) 2008 Meraki, Inc.
  *
  * Permission is hereby granted, free of charge, to any person obtaining a
  * copy of this software and associated documentation files (the "Software"),
@@ -26,6 +27,7 @@
 #include <clicknet/ip.h>
 #include <clicknet/tcp.h>
 #include <clicknet/udp.h>
+#include <clicknet/icmp.h>
 CLICK_DECLS
 
 static Vector<const void *> *writers;
@@ -318,7 +320,7 @@ const uint8_t *inb(PacketOdesc& d, const uint8_t *s, const uint8_t *end, const F
 	d.v = GET4(s);
 	return s + 4;
     case B_6PTR:
-	if (s + 6 >= end)
+	if (s + 5 >= end)
 	    goto bad;
 	memcpy(d.u8, s, 6);
 	return s + 6;
@@ -404,13 +406,9 @@ void ip_prepare(PacketDesc& d, const FieldWriter *)
 
     // Adjust extra length, since we calculate lengths here based on ip_len.
     if (d.iph && EXTRA_LENGTH_ANNO(p) > 0) {
-	int32_t full_len = p->length() + EXTRA_LENGTH_ANNO(p);
-	if (ntohs(d.iph->ip_len) + 8 >= full_len - p->network_header_offset())
-	    SET_EXTRA_LENGTH_ANNO(p, 0);
-	else {
-	    full_len = full_len - ntohs(d.iph->ip_len);
-	    SET_EXTRA_LENGTH_ANNO(p, full_len);
-	}
+	uint32_t full_len = p->length() + EXTRA_LENGTH_ANNO(p);
+	uint32_t ip_len = p->network_header_offset() + ntohs(d.iph->ip_len);
+	SET_EXTRA_LENGTH_ANNO(p, full_len > ip_len ? full_len - ip_len : 0);
     }
 }
 
@@ -429,6 +427,7 @@ bool PacketOdesc::hard_make_ip()
 	iph->ip_v = 4;
 	iph->ip_hl = sizeof(click_ip) >> 2;
 	iph->ip_p = default_ip_p;
+	iph->ip_len = 0;
 	iph->ip_off = 0;
 	iph->ip_ttl = 100;
 	if (default_ip_flowid) {
@@ -455,23 +454,29 @@ bool PacketOdesc::hard_make_transp()
 	case IP_PROTO_DCCP:
 	    len = 12;
 	    break;
-	case 0:
-	    len = 8;
+	case IP_PROTO_ICMP:
+	    len = sizeof(click_icmp);
 	    break;
 	default:
 	    return true;
 	}
+	if (want_len > 0
+	    && want_len < (uint32_t) p->transport_header_offset() + len)
+	    len = want_len - p->transport_header_offset();
 
 	if (p->transport_length() < len) {
-	    if (!(p = p->put(len - p->transport_length())))
+	    int xlen = (len < 4 ? 4 : len);
+	    if (!(p = p->put(xlen - p->transport_length())))
 		return false;
-	    if (p->ip_header()->ip_p == IP_PROTO_TCP)
+	    if (p->ip_header()->ip_p == IP_PROTO_TCP && len >= 13)
 		p->tcp_header()->th_off = sizeof(click_tcp) >> 2;
 	    if (default_ip_flowid) {
 		click_udp *udph = p->udp_header();
 		udph->uh_sport = default_ip_flowid->sport();
 		udph->uh_dport = default_ip_flowid->dport();
 	    }
+	    if (xlen > len)
+		p->take(xlen - len);
 	}
     }
 

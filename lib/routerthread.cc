@@ -435,13 +435,13 @@ RouterThread::run_os()
 	schedule();
     } else if (Timestamp wait = _master->next_timer_expiry_adjusted()) {
 	wait -= Timestamp::now();
-	if (!(wait > Timestamp(0, Timestamp::NSUBSEC / CLICK_HZ)))
+	if (!(wait > Timestamp(0, Timestamp::subsec_per_sec / CLICK_HZ)))
 	    goto short_pause;
 	SET_STATE(S_TIMER);
 	if (wait.sec() >= LONG_MAX / CLICK_HZ - 1)
 	    (void) schedule_timeout(LONG_MAX - CLICK_HZ - 1);
 	else
-	    (void) schedule_timeout((wait.sec() * CLICK_HZ) + (wait.subsec() * CLICK_HZ / Timestamp::NSUBSEC) - 1);
+	    (void) schedule_timeout(wait.jiffies() - 1);
     } else
 	goto block;
     SET_STATE(S_RUNNING);
@@ -630,7 +630,7 @@ RouterThread::unschedule_router_tasks(Router* r)
 #if HAVE_TASK_HEAP
     Task* t;
     for (Task** tp = _task_heap.end(); tp > _task_heap.begin(); )
-	if ((t = *--tp, t->_router == r)) {
+	if ((t = *--tp, t->router() == r)) {
 	    task_reheapify_from(tp - _task_heap.begin(), _task_heap.back());
 	    // must clear _schedpos AFTER task_reheapify_from
 	    t->_schedpos = -1;
@@ -643,7 +643,7 @@ RouterThread::unschedule_router_tasks(Router* r)
     Task* prev = this;
     Task* t;
     for (t = prev->_next; t != this; t = t->_next)
-	if (t->_router == r)
+	if (t->router() == r)
 	    t->_prev = 0;
 	else {
 	    prev->_next = t;

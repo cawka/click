@@ -1,6 +1,9 @@
 // -*- c-basic-offset: 4 -*-
 #ifndef STATICTHREADSCHED_HH
 #define STATICTHREADSCHED_HH
+#include <click/element.hh>
+#include <click/standard/threadsched.hh>
+CLICK_DECLS
 
 /*
  * =c
@@ -15,9 +18,6 @@
  * ThreadMonitor, BalancedThreadSched
  */
 
-#include <click/element.hh>
-#include <click/standard/threadsched.hh>
-
 class StaticThreadSched : public Element, public ThreadSched { public:
 
     StaticThreadSched();
@@ -27,7 +27,7 @@ class StaticThreadSched : public Element, public ThreadSched { public:
 
     int configure(Vector<String> &, ErrorHandler *);
 
-    int initial_home_thread_id(Task *, bool);
+    int initial_home_thread_id(Element *owner, Task *task, bool scheduled);
 
   private:
 
@@ -36,4 +36,5 @@ class StaticThreadSched : public Element, public ThreadSched { public:
 
 };
 
+CLICK_ENDDECLS
 #endif

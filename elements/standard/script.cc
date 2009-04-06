@@ -6,7 +6,7 @@
  * Copyright (c) 2001 International Computer Science Institute
  * Copyright (c) 2001 Mazu Networks, Inc.
  * Copyright (c) 2005-2008 Regents of the University of California
- * Copyright (c) 2008 Meraki, Inc.
+ * Copyright (c) 2008-2009 Meraki, Inc.
  *
  * Permission is hereby granted, free of charge, to any person obtaining a
  * copy of this software and associated documentation files (the "Software"),
@@ -100,7 +100,7 @@ Script::static_cleanup()
 }
 
 Script::Script()
-    : _type(TYPE_ACTIVE), _write_status(0), _timer(this), _cur_steps(0)
+    : _type(type_active), _write_status(0), _timer(this), _cur_steps(0)
 {
 }
 
@@ -139,12 +139,18 @@ Script::find_label(const String &label) const
 }
 
 int
-Script::find_variable(const String &varname) const
+Script::find_variable(const String &name, bool add)
 {
-    for (int i = 0; i < _vars.size(); i += 2)
-	if (_vars[i] == varname)
-	    return i;
-    return _vars.size();
+    int i;
+    for (i = 0; i < _vars.size(); i += 2)
+	if (_vars[i] == name)
+	    goto found;
+    if (add) {
+	_vars.push_back(name);
+	_vars.push_back(String());
+    }
+ found:
+    return i;
 }
 
 int
@@ -159,20 +165,22 @@ Script::configure(Vector<String> &conf, ErrorHandler *errh)
 
     int before = errh->nerrors();
 
-    String type_word = cp_pop_spacevec(type_arg);
+    String type_word = cp_shift_spacevec(type_arg);
     if (type_word == "ACTIVE" && !type_arg)
-	_type = TYPE_ACTIVE;
+	_type = type_active;
     else if (type_word == "PASSIVE" && !type_arg)
-	_type = TYPE_PASSIVE;
+	_type = type_passive;
+    else if ((type_word == "PACKET" || type_word == "PUSH") && !type_arg)
+	_type = type_push;
     else if (type_word == "PROXY" && !type_arg)
 	_type = type_proxy;
     else if (type_word == "DRIVER" && !type_arg)
-	_type = TYPE_DRIVER;
+	_type = type_driver;
 #if CLICK_USERLEVEL
     else if (type_word == "SIGNAL") {
-	_type = TYPE_SIGNAL;
+	_type = type_signal;
 	int32_t signo;
-	while ((type_word = cp_pop_spacevec(type_arg))
+	while ((type_word = cp_shift_spacevec(type_arg))
 	       && NameInfo::query_int(NameInfo::T_SIGNO, this, type_word, &signo)
 	       && signo >= 0 && signo < 32)
 	    _signos.push_back(signo);
@@ -181,20 +189,21 @@ Script::configure(Vector<String> &conf, ErrorHandler *errh)
     }
 #endif
     else if (type_word)
-#if CLICK_USERLEVEL
-	return errh->error("bad TYPE; expected 'ACTIVE', 'PASSIVE', 'DRIVER', 'SIGNAL'");
-#else
-	return errh->error("bad TYPE; expected 'ACTIVE', 'PASSIVE', 'DRIVER'");
-#endif
+	return errh->error("bad TYPE");
 
-    if (_type == TYPE_DRIVER) {
+    if (_type == type_driver) {
 	if (router()->attachment("Script"))
-	    return errh->error("router has more than one Script element");
+	    return errh->error("router has more than one driver script");
 	router()->set_attachment("Script", this);
     }
 
+    if (_type == type_push && ninputs() == 0)
+	return errh->error("PACKET script must have inputs");
+    else if (_type != type_push && (ninputs() || noutputs()))
+	return errh->error("ports allowed only on PACKET scripts");
+
     for (int i = 0; i < conf.size(); i++) {
-	String insn_name = cp_pop_spacevec(conf[i]);
+	String insn_name = cp_shift_spacevec(conf[i]);
 	int32_t insn;
 	if (!insn_name)		// ignore as benign
 	    continue;
@@ -239,16 +248,11 @@ Script::configure(Vector<String> &conf, ErrorHandler *errh)
 	case insn_initq:
 	case INSN_SET:
 	case insn_setq: {
-	    String word = cp_pop_spacevec(conf[i]);
+	    String word = cp_shift_spacevec(conf[i]);
 	    if (!word
 		|| ((insn == INSN_SET || insn == insn_setq) && !conf[i]))
 		goto syntax_error;
-	    int x = find_variable(word);
-	    if (x == _vars.size()) {
-		_vars.push_back(word);
-		_vars.push_back(String());
-	    }
-	    add_insn(insn, x, 0, conf[i]);
+	    add_insn(insn, find_variable(word, true), 0, conf[i]);
 	    break;
 	}
 
@@ -258,7 +262,7 @@ Script::configure(Vector<String> &conf, ErrorHandler *errh)
 	    break;
 
 	case INSN_LABEL: {
-	    String word = cp_pop_spacevec(conf[i]);
+	    String word = cp_shift_spacevec(conf[i]);
 	    if (!word || conf[i])
 		goto syntax_error;
 	    add_insn(insn, 0, 0, word);
@@ -289,14 +293,14 @@ Script::configure(Vector<String> &conf, ErrorHandler *errh)
     // fix the gotos
     for (int i = 0; i < _insns.size(); i++)
 	if (_insns[i] == INSN_GOTO && _args3[i]) {
-	    String word = cp_pop_spacevec(_args3[i]);
+	    String word = cp_shift_spacevec(_args3[i]);
 	    if ((_args[i] = find_label(word)) >= _insns.size())
 		errh->error("no such label '%s'", word.c_str());
 	}
 
-    if (_insns.size() == 0 && _type == TYPE_DRIVER)
+    if (_insns.size() == 0 && _type == type_driver)
 	add_insn(INSN_WAIT_STEP, 1, 0);
-    add_insn(_type == TYPE_DRIVER ? INSN_STOP : INSN_END, 0);
+    add_insn(_type == type_driver ? INSN_STOP : INSN_END, 0);
 
     return (errh->nerrors() == before ? 0 : -1);
 }
@@ -319,7 +323,8 @@ Script::initialize(ErrorHandler *errh)
 
     int insn = _insns[_insn_pos];
     assert(insn <= INSN_WAIT_TIME);
-    if (_type == TYPE_SIGNAL || _type == TYPE_PASSIVE || _type == type_proxy)
+    if (_type == type_signal || _type == type_passive || _type == type_push
+	|| _type == type_proxy)
 	/* passive, do nothing */;
     else if (insn == INSN_WAIT_TIME) {
 	Timestamp ts;
@@ -329,7 +334,7 @@ Script::initialize(ErrorHandler *errh)
 	    errh->error("syntax error at 'wait'");
     } else if (insn == INSN_INITIAL) {
 	// get rid of the initial runcount so we get called right away
-	if (_type == TYPE_DRIVER)
+	if (_type == type_driver)
 	    router()->adjust_runcount(-1);
 	else
 	    _timer.schedule_now();
@@ -337,7 +342,7 @@ Script::initialize(ErrorHandler *errh)
     }
 
 #if CLICK_USERLEVEL
-    if (_type == TYPE_SIGNAL)
+    if (_type == type_signal)
 	for (int i = 0; i < _signos.size(); i++)
 	    master()->add_signal_handler(_signos[i], router(), name() + ".run");
 #endif
@@ -412,7 +417,7 @@ Script::step(int nsteps, int step_type, int njumps, ErrorHandler *errh)
 	    if (text.length() && text[0] == '>') {
 		bool append = (text.length() > 1 && text[1] == '>');
 		text = text.substring(1 + append);
-		String filename = cp_pop_spacevec(text);
+		String filename = cp_shift_spacevec(text);
 		if (filename && filename != "-"
 		    && !(f = fopen(filename.c_str(), append ? "ab" : "wb"))) {
 		    errh->error("%s: %s", filename.c_str(), strerror(errno));
@@ -434,7 +439,7 @@ Script::step(int nsteps, int step_type, int njumps, ErrorHandler *errh)
 		result += "\n";
 
 #if CLICK_USERLEVEL || CLICK_TOOL
-	    fwrite(result.data(), 1, result.length(), f);
+	    ignore_result(fwrite(result.data(), 1, result.length(), f));
 	    if (f == stdout)
 		fflush(f);
 	    else
@@ -450,7 +455,7 @@ Script::step(int nsteps, int step_type, int njumps, ErrorHandler *errh)
 	    String arg = (insn == INSN_READ ? _args3[ipos] : cp_unquote(_args3[ipos]));
 	    HandlerCall hc(cp_expand(arg, expander));
 	    if (hc.initialize_read(this, errh) >= 0) {
-		ContextErrorHandler c_errh(errh, "While calling '" + hc.unparse() + "':");
+		ContextErrorHandler c_errh(errh, "While calling %<%s%>:", hc.unparse().c_str());
 		String result = hc.call_read(&c_errh);
 		ErrorHandler *d_errh = ErrorHandler::default_handler();
 		d_errh->message("%s:\n%s\n", hc.handler()->unparse_name(hc.element()).c_str(), result.c_str());
@@ -463,7 +468,7 @@ Script::step(int nsteps, int step_type, int njumps, ErrorHandler *errh)
 	    String arg = (insn == INSN_WRITE ? _args3[ipos] : cp_unquote(_args3[ipos]));
 	    HandlerCall hc(cp_expand(arg, expander));
 	    if (hc.initialize_write(this, errh) >= 0) {
-		ContextErrorHandler c_errh(errh, "While calling '" + hc.unparse() + "':");
+		ContextErrorHandler c_errh(errh, "While calling %<%s%>:", hc.unparse().c_str());
 		_write_status = hc.call_write(&c_errh);
 	    }
 	    break;
@@ -553,7 +558,7 @@ Script::complete_step(String *retval)
     }
 
 #if CLICK_USERLEVEL
-    if (last_insn == INSN_END && _type == TYPE_SIGNAL)
+    if (last_insn == INSN_END && _type == type_signal)
 	for (int i = 0; i < _signos.size(); i++)
 	    master()->add_signal_handler(_signos[i], router(), name() + ".run");
 #endif
@@ -561,9 +566,11 @@ Script::complete_step(String *retval)
     if (retval) {
 	int x;
 	*retval = String();
-	if (last_insn == INSN_RETURN || last_insn == insn_returnq)
-	    if ((x = find_variable("_")) < _vars.size())
+	if (last_insn == INSN_RETURN || last_insn == insn_returnq) {
+	    if ((x = find_variable(String::make_stable("_", 1), false)) < _vars.size())
 		*retval = _vars[x + 1];
+	} else if (last_insn == INSN_END && _type == type_push)
+	    *retval = String::make_stable("0", 1);
     }
 
     if (last_insn == insn_error || last_insn == insn_errorq)
@@ -580,15 +587,35 @@ Script::run_timer(Timer *)
     // called when a timer expires
     assert(_insns[_insn_pos] == INSN_WAIT_TIME || _insns[_insn_pos] == INSN_INITIAL);
     ErrorHandler *errh = ErrorHandler::default_handler();
-    ContextErrorHandler cerrh(errh, "While executing '" + declaration() + "':");
+    ContextErrorHandler cerrh(errh, "While executing %<%{element}%>:", this);
     step(1, STEP_TIMER, 0, &cerrh);
     complete_step(0);
+}
+
+void
+Script::push(int port, Packet *p)
+{
+    ErrorHandler *errh = ErrorHandler::default_handler();
+    ContextErrorHandler cerrh(errh, "While executing %<%{element}%>:", this);
+
+    // This is slow, but it probably doesn't need to be fast.
+    int i = find_variable(String::make_stable("input", 5), true);
+    _vars[i + 1] = String(port);
+
+    _insn_pos = 0;
+    step(0, STEP_JUMP, 0, &cerrh);
+    String out;
+    complete_step(&out);
+
+    port = -1;
+    (void) cp_integer(out, &port);
+    checked_output_push(port, p);
 }
 
 bool
 Script::Expander::expand(const String &vname, int vartype, int quote, StringAccum &sa) const
 {
-    int x = script->find_variable(vname);
+    int x = script->find_variable(vname, false);
     if (x < script->_vars.size()) {
 	sa << cp_expand_in_quotes(script->_vars[x + 1], quote);
 	return true;
@@ -613,14 +640,14 @@ Script::Expander::expand(const String &vname, int vartype, int quote, StringAccu
 	&& cp_integer(vname, &x)) {
 	String arg, run_args = script->_run_args;
 	for (; x > 0; --x)
-	    arg = cp_pop_spacevec(run_args);
+	    arg = cp_shift_spacevec(run_args);
 	sa << cp_expand_in_quotes(arg, quote);
 	return true;
     }
 
     if (vname.length() == 1 && vname[0] == '#') {
 	String run_args = script->_run_args;
-	for (x = 0; cp_pop_spacevec(run_args); )
+	for (x = 0; cp_shift_spacevec(run_args); )
 	    ++x;
 	sa << cp_expand_in_quotes(String(x), quote);
 	return true;
@@ -641,14 +668,6 @@ Script::Expander::expand(const String &vname, int vartype, int quote, StringAccu
 
     return false;
 }
-
-enum {
-    ST_STEP = 0, ST_RUN, ST_GOTO,
-    AR_ADD = 0, AR_SUB, AR_MUL, AR_DIV, AR_IDIV,
-    AR_LT, AR_EQ, AR_GT, AR_GE, AR_NE, AR_LE, // order is important
-    AR_FIRST, AR_NOT, AR_SPRINTF, ar_random, ar_cat,
-    ar_and, ar_or, ar_now
-};
 
 int
 Script::step_handler(int op, String &str, Element *e, const Handler *h, ErrorHandler *errh)
@@ -718,7 +737,7 @@ Script::arithmetic_handler(int, String &str, Element *e, const Handler *h, Error
     switch (what) {
 
     case AR_FIRST:
-	str = cp_pop_spacevec(str);
+	str = cp_shift_spacevec(str);
 	return 0;
 
     case AR_ADD:
@@ -733,7 +752,7 @@ Script::arithmetic_handler(int, String &str, Element *e, const Handler *h, Error
 	bool use_daccum = (what == AR_DIV || what == AR_IDIV);
 #endif
 	while (1) {
-	    String word = cp_pop_spacevec(str);
+	    String word = cp_shift_spacevec(str);
 	    if (!word && cp_is_space(str))
 		break;
 #if CLICK_USERLEVEL
@@ -795,17 +814,46 @@ Script::arithmetic_handler(int, String &str, Element *e, const Handler *h, Error
 	return 0;
     }
 
+    case ar_mod:
+    case ar_rem: {
+	String astr = cp_shift_spacevec(str), bstr = cp_shift_spacevec(str);
+	click_intmax_t a, b;
+	if (str || !astr || !bstr)
+	    goto expected_two_numbers;
+	if (!cp_integer(astr, &a) || !cp_integer(bstr, &b)) {
+#if CLICK_USERLEVEL
+	    double da, db;
+	    if (what == ar_mod || !cp_double(astr, &da) || !cp_double(bstr, &db))
+		goto expected_two_numbers;
+	    str = String(fmod(da, db));
+	    return 0;
+#else
+	    goto expected_two_numbers;
+#endif
+	} else {
+#if CLICK_LINUXMODULE
+	    if ((int32_t) a != a || (int32_t) b != b)
+		errh->warning("int64 divide truncated");
+	    a = (int32_t) a % (int32_t) b;
+#else
+	    a %= b;
+#endif
+	    str = String(a);
+	    return 0;
+	}
+    }
+
     case AR_LT:
     case AR_EQ:
     case AR_GT:
     case AR_LE:
     case AR_NE:
     case AR_GE: {
-	String astr = cp_pop_spacevec(str), bstr = cp_pop_spacevec(str);
+	String astr = cp_shift_spacevec(str), bstr = cp_shift_spacevec(str);
 	click_intmax_t a, b;
 	int comparison;
 	if (str || !astr || !bstr)
-	    goto compare_syntax;
+	    goto expected_two_numbers;
 #if CLICK_USERLEVEL
 	if (!cp_integer(astr, &a) || !cp_integer(bstr, &b)) {
 	    double da, db;
@@ -823,8 +871,6 @@ Script::arithmetic_handler(int, String &str, Element *e, const Handler *h, Error
 	str = cp_unparse_bool(what == comparison
 			      || (what >= AR_GE && what != comparison + 3));
 	return 0;
-    compare_syntax:
-	return errh->error("expected two numbers");
     compare_strings:
 	a = String::compare(cp_unquote(astr), cp_unquote(bstr));
 	comparison = (a < 0 ? AR_LT : (a == 0 ? AR_EQ : AR_GT));
@@ -844,11 +890,24 @@ Script::arithmetic_handler(int, String &str, Element *e, const Handler *h, Error
 	bool zero = (what == ar_and), current_value = zero;
 	while (current_value == zero && str) {
 	    bool x;
-	    if (!cp_bool(cp_pop_spacevec(str), &x))
+	    if (!cp_bool(cp_shift_spacevec(str), &x))
 		return errh->error("syntax error");
 	    current_value = (what == ar_and ? current_value && x : current_value || x);
 	}
 	str = cp_unparse_bool(current_value);
+	return 0;
+    }
+
+    case ar_if: {
+	bool x;
+	if (!cp_bool(cp_shift_spacevec(str), &x))
+	    return errh->error("syntax error");
+	if (x)
+	    str = cp_shift_spacevec(str);
+	else {
+	    (void) cp_shift_spacevec(str);
+	    str = cp_shift_spacevec(str);
+	}
 	return 0;
     }
 
@@ -857,7 +916,7 @@ Script::arithmetic_handler(int, String &str, Element *e, const Handler *h, Error
 	return 0;
 
     case AR_SPRINTF: {
-	String format = cp_unquote(cp_pop_spacevec(str));
+	String format = cp_unquote(cp_shift_spacevec(str));
 	const char *s = format.begin(), *pct, *end = format.end();
 	StringAccum result;
 	while ((pct = find(s, end, '%')) < end) {
@@ -871,7 +930,7 @@ Script::arithmetic_handler(int, String &str, Element *e, const Handler *h, Error
 	    // field width
 	    int fw;
 	    if (pct < end && *pct == '*') {
-		if (!cp_integer(cp_pop_spacevec(str), &fw))
+		if (!cp_integer(cp_shift_spacevec(str), &fw))
 		    return errh->error("syntax error");
 		pf << fw;
 	    } else
@@ -881,7 +940,7 @@ Script::arithmetic_handler(int, String &str, Element *e, const Handler *h, Error
 	    if (pct < end && *pct == '.') {
 		pct++;
 		if (pct < end && *pct == '*') {
-		    if (!cp_integer(cp_pop_spacevec(str), &fw) || fw < 0)
+		    if (!cp_integer(cp_shift_spacevec(str), &fw) || fw < 0)
 			return errh->error("syntax error");
 		    pf << '.' << fw;
 		} else if (pct < end && *pct >= '0' && *pct <= '9') {
@@ -905,7 +964,7 @@ Script::arithmetic_handler(int, String &str, Element *e, const Handler *h, Error
 	    // conversion
 	    if (pct < end && (*pct == 'o' || *pct == 'x' || *pct == 'X' || *pct == 'u')) {
 		click_uintmax_t ival;
-		String x = cp_pop_spacevec(str);
+		String x = cp_shift_spacevec(str);
 		if (!cp_integer(x, &ival))
 		    return errh->error("syntax error");
 		if (width_flag == 'h')
@@ -916,7 +975,7 @@ Script::arithmetic_handler(int, String &str, Element *e, const Handler *h, Error
 		result << ErrorHandler::xformat(pf.c_str(), ival);
 	    } else if (pct < end && (*pct == 'd' || *pct == 'i')) {
 		click_intmax_t ival;
-		if (!cp_integer(cp_pop_spacevec(str), &ival))
+		if (!cp_integer(cp_shift_spacevec(str), &ival))
 		    return errh->error("syntax error");
 		if (width_flag == 'h')
 		    ival = (short) ival;
@@ -929,7 +988,7 @@ Script::arithmetic_handler(int, String &str, Element *e, const Handler *h, Error
 		result << ErrorHandler::xformat(pf.c_str());
 	    } else if (pct < end && *pct == 's') {
 		String s;
-		if (!cp_string(cp_pop_spacevec(str), &s))
+		if (!cp_string(cp_shift_spacevec(str), &s))
 		    return errh->error("syntax error");
 		pf << *pct;
 		result << ErrorHandler::xformat(pf.c_str(), s.c_str());
@@ -976,6 +1035,23 @@ Script::arithmetic_handler(int, String &str, Element *e, const Handler *h, Error
     }
 #endif
 
+    case ar_readable:
+    case ar_writable: {
+	Element *el;
+	const Handler *h;
+	int f = (what == ar_readable ? Handler::OP_READ : Handler::OP_WRITE);
+	while (String hname = cp_shift_spacevec(str))
+	    if (!cp_handler(hname, f, &el, &h, e)) {
+		str = String(false);
+		return 0;
+	    }
+	str = String(true);
+	return 0;
+    }
+
+    expected_two_numbers:
+	return errh->error("expected two numbers");
+
     }
 
     return -1;
@@ -1000,6 +1076,8 @@ Script::add_handlers()
     set_handler("mul", Handler::OP_READ | Handler::READ_PARAM, arithmetic_handler, AR_MUL, 0);
     set_handler("div", Handler::OP_READ | Handler::READ_PARAM, arithmetic_handler, AR_DIV, 0);
     set_handler("idiv", Handler::OP_READ | Handler::READ_PARAM, arithmetic_handler, AR_IDIV, 0);
+    set_handler("mod", Handler::OP_READ | Handler::READ_PARAM, arithmetic_handler, ar_mod, 0);
+    set_handler("rem", Handler::OP_READ | Handler::READ_PARAM, arithmetic_handler, ar_rem, 0);
     set_handler("eq", Handler::OP_READ | Handler::READ_PARAM, arithmetic_handler, AR_EQ, 0);
     set_handler("ne", Handler::OP_READ | Handler::READ_PARAM, arithmetic_handler, AR_NE, 0);
     set_handler("gt", Handler::OP_READ | Handler::READ_PARAM, arithmetic_handler, AR_GT, 0);
@@ -1012,7 +1090,11 @@ Script::add_handlers()
     set_handler("random", Handler::OP_READ | Handler::READ_PARAM, arithmetic_handler, ar_random, 0);
     set_handler("and", Handler::OP_READ | Handler::READ_PARAM, arithmetic_handler, ar_and, 0);
     set_handler("or", Handler::OP_READ | Handler::READ_PARAM, arithmetic_handler, ar_or, 0);
+    set_handler("if", Handler::OP_READ | Handler::READ_PARAM, arithmetic_handler, ar_if, 0);
+    set_handler("in", Handler::OP_READ | Handler::READ_PARAM, arithmetic_handler, ar_in, 0);
     set_handler("now", Handler::OP_READ, arithmetic_handler, ar_now, 0);
+    set_handler("readable", Handler::OP_READ | Handler::READ_PARAM, arithmetic_handler, ar_readable, 0);
+    set_handler("writable", Handler::OP_READ | Handler::READ_PARAM, arithmetic_handler, ar_writable, 0);
 #if CLICK_USERLEVEL
     set_handler("cat", Handler::OP_READ | Handler::READ_PARAM | Handler::READ_PRIVATE, arithmetic_handler, ar_cat, 0);
 #endif
