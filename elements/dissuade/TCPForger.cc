@@ -30,6 +30,7 @@ void TCPForger::push( int, Packet *pkt )
 	{
 		output(0).push( pkt->clone() );
 		output(0).push( pkt->clone() );
+		output(0).push( pkt->clone() );
 		output(0).push( pkt );
 	}
 }
